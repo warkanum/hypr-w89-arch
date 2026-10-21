@@ -26,6 +26,16 @@ kde=(
   okular
   kate
   xdg-desktop-portal-kde
+  kwallet
+  kwallet-pam
+  kwalletmanager
+  ksshaskpass
+  kdeconnect
+  kcalc
+  kdialog
+  kfind
+  filelight
+  partitionmanager
 )
 
 ## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
@@ -58,6 +68,18 @@ default=hyprland;gtk
 org.freedesktop.impl.portal.FileChooser=kde
 PORTALS
 echo "${OK} Portal config written to $portals" | tee -a "$LOG"
+
+# KWallet auto-unlock at SDDM login (pam_kwallet5.so is the module for KWallet 6 as well)
+if [ -f /etc/pam.d/sddm ] && grep -q 'pam_kwallet5.so' /etc/pam.d/sddm; then
+  echo "${OK} SDDM PAM already has pam_kwallet5. Wallet unlocks at login if it uses your login password." | tee -a "$LOG"
+else
+  echo "${WARN} /etc/pam.d/sddm has no pam_kwallet5 lines; KWallet will not auto-unlock at login." | tee -a "$LOG"
+fi
+
+# Both wallets provide org.freedesktop.secrets; only one can own it
+if pacman -Qq gnome-keyring >/dev/null 2>&1; then
+  echo "${WARN} gnome-keyring is installed and competes with KWallet for org.freedesktop.secrets. Remove it if KWallet should be the only secret service." | tee -a "$LOG"
+fi
 
 echo "${NOTE} Qt env + colours are applied by hypr_theme.sh (runs after the dots)." | tee -a "$LOG"
 printf "\n%.0s" {1..2}

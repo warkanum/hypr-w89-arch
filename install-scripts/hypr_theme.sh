@@ -76,6 +76,10 @@ if command -v dolphin >/dev/null 2>&1; then
   if [ -f "$ud" ] && ! grep -q '^KOOLDOTS_DEFAULTS.files' "$ud"; then
     echo 'KOOLDOTS_DEFAULTS.files = "dolphin"' >> "$ud"
   fi
+  # ssh passphrases via KWallet
+  if [ -f "$envlua" ] && command -v ksshaskpass >/dev/null 2>&1 && ! grep -q SSH_ASKPASS "$envlua"; then
+    printf '%s\n' 'hl.env("SSH_ASKPASS", "/usr/bin/ksshaskpass")' 'hl.env("SSH_ASKPASS_REQUIRE", "prefer")' >> "$envlua"
+  fi
   echo "${OK} KDE mode: Qt platform theme = kde, file manager = dolphin." 2>&1 | tee -a "$LOG"
 fi
 
