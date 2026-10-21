@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Stargate
+Description=Stargate dialling boot splash. Chevrons lock as the system boots, the event horizon opens at the end.
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/stargate
+ScriptFile=/usr/share/plymouth/themes/stargate/stargate.script

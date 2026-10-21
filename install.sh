@@ -158,6 +158,7 @@ gtk_themes="OFF"
 bluetooth="OFF"
 thunar="OFF"
 kde="OFF"
+boot_theme="OFF"
 sddm="OFF"
 sddm_theme="OFF"
 zsh="OFF"
@@ -294,6 +295,7 @@ options_command+=(
   "bluetooth" "Do you want script to configure Bluetooth?" "OFF"
   "thunar" "Do you want Thunar file manager to be installed?" "OFF"
   "kde" "Install KDE apps (Dolphin, Breeze, KDE portal) and theme Qt with KDE?" "OFF"
+  "boot_theme" "Stargate boot splash (Plymouth) + GRUB theme? Edits initramfs/bootloader, backed up" "OFF"
   "zsh" "Install zsh shell with Oh-My-Zsh?" "OFF"
   "star_lore" "Add Stargate/Star Trek fastfetch art (fastfetch-star-lore)?" "OFF"
   "rog" "Are you installing on Asus ROG laptops?" "OFF"
@@ -517,6 +519,10 @@ for option in "${options[@]}"; do
   kde)
     echo "${INFO} Installing ${SKY_BLUE}KDE apps...${RESET}" | tee -a "$LOG"
     execute_script "kde.sh"
+    ;;
+  boot_theme)
+    echo "${INFO} Installing ${SKY_BLUE}boot splash and GRUB theme...${RESET}" | tee -a "$LOG"
+    execute_script "boot_theme.sh"
     ;;
   rog)
     echo "${INFO} Installing ${SKY_BLUE}ROG laptop packages...${RESET}" | tee -a "$LOG"

@@ -74,6 +74,16 @@ installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout p
 - Wallpapers: `assets/hypr-themes/wallpapers/` -> `~/Pictures/wallpapers`.
 - Includes Stargate, Atlantis, dark-grey, and LCARS wallpapers. The two Starfleet wallpapers remain missing; prompts and generation status are in `assets/hypr-themes/WALLPAPERS.md`.
 
+## Boot chain (`assets/boot-stargate`, `install-scripts/boot_theme.sh`)
+
+- Plymouth `stargate`: 9 chevrons lock as boot progresses, event horizon opens at the end, passphrase prompt styled.
+- GRUB theme (GRUB only): space background, right-hand "Stargate Command" menu, "Dialling in N..." timeout.
+- systemd-boot: Plymouth only (no bootloader theme).
+- Edits `/etc/mkinitcpio.conf`, kernel cmdline (`quiet splash`), `/etc/default/grub`; backups in `~/.cache/hypr-w89-boot-backup`.
+- Undo: `./install-scripts/boot_theme.sh --revert` (from repo root).
+- Regenerate images: `python3 assets/boot-stargate/tools/generate.py` (needs python-pillow).
+- Secure Boot: re-sign the initramfs/UKI if you sign them.
+
 ## KDE mode (`install-scripts/kde.sh` + `hypr_theme.sh`)
 
 - Also: kwallet + kwallet-pam (auto-unlock via SDDM PAM, needs wallet password = login password), kwalletmanager, ksshaskpass (`SSH_ASKPASS`), kdeconnect, kcalc, kdialog, kfind, filelight, partitionmanager.
@@ -90,6 +100,7 @@ installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout p
 - Hyprlock uses the current wallpaper; swaync, ags and quickshell audited, no anime content.
 - Remaining wlogout presets: default, silvia (nebula), hadi493, BlueBerries (neon street).
 - GTK apps (browsers etc.) are not KDE-themed; GTK pack is kept minimal.
+- Plymouth and GRUB themes are untested on real boot (no plymouth/GRUB renderer here).
 - Install scripts verified with `bash -n` only; full install not yet run.
 
 See `CHANGELOGS.md`.

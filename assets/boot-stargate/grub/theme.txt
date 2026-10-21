@@ -1,0 +1,76 @@
+# Stargate GRUB theme
+desktop-image: "background.png"
+desktop-image-scale-method: "crop"
+desktop-color: "#000000"
+title-text: ""
+terminal-font: "Unifont Regular 16"
+terminal-left: "8%"
+terminal-top: "10%"
+terminal-width: "84%"
+terminal-height: "80%"
+terminal-border: "0"
+
++ label {
+  left = 76%
+  top = 14%
+  width = 22%
+  height = 30
+  text = "STARGATE COMMAND"
+  font = "Unifont Regular 16"
+  color = "#7fd4ff"
+  align = "left"
+}
+
++ boot_menu {
+  left = 76%
+  top = 20%
+  width = 22%
+  height = 56%
+  item_font = "Unifont Regular 16"
+  item_color = "#9fb4c4"
+  selected_item_color = "#ffffff"
+  icon_width = 0
+  icon_height = 0
+  item_height = 36
+  item_padding = 10
+  item_icon_space = 0
+  item_spacing = 6
+  menu_pixmap_style = "panel_*.png"
+  selected_item_pixmap_style = "select_*.png"
+  scrollbar = false
+}
+
++ progress_bar {
+  id = "__timeout__"
+  left = 76%
+  top = 80%
+  width = 22%
+  height = 14
+  show_text = false
+  fg_color = "#7fd4ff"
+  bg_color = "#14202c"
+  border_color = "#14202c"
+}
+
++ label {
+  id = "__timeout__"
+  left = 76%
+  top = 84%
+  width = 22%
+  height = 24
+  text = "Dialling in %d..."
+  font = "Unifont Regular 16"
+  color = "#7fd4ff"
+  align = "left"
+}
+
++ label {
+  left = 76%
+  top = 93%
+  width = 22%
+  height = 24
+  text = "ENTER: boot   E: edit   C: console"
+  font = "Unifont Regular 16"
+  color = "#5f7a90"
+  align = "left"
+}

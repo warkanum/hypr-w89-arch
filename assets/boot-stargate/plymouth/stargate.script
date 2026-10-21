@@ -1,0 +1,134 @@
+# Stargate boot splash: 9 chevrons lock in sequence, the event horizon opens when boot finishes.
+
+Window.SetBackgroundTopColor(0.0, 0.0, 0.02);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
+
+sw = Window.GetWidth();
+sh = Window.GetHeight();
+
+# Background, scaled to cover the screen
+bg = Image("bg.png");
+bgscale = Math.Max(sw / bg.GetWidth(), sh / bg.GetHeight());
+bgimg = bg.Scale(bg.GetWidth() * bgscale, bg.GetHeight() * bgscale);
+bgsprite = Sprite(bgimg);
+bgsprite.SetX(sw / 2 - bgimg.GetWidth() / 2);
+bgsprite.SetY(sh / 2 - bgimg.GetHeight() / 2);
+bgsprite.SetZ(-100);
+
+# Gate sized to the screen, centred
+gs = Math.Min(sw, sh) * 0.78;
+gx = sw / 2 - gs / 2;
+gy = sh / 2 - gs / 2;
+
+horizon = Sprite(Image("horizon.png").Scale(gs, gs));
+horizon.SetX(gx);
+horizon.SetY(gy);
+horizon.SetZ(1);
+horizon.SetOpacity(0.0);
+
+ring = Sprite(Image("ring.png").Scale(gs, gs));
+ring.SetX(gx);
+ring.SetY(gy);
+ring.SetZ(2);
+
+for (i = 0; i < 9; i++) {
+  chevron[i] = Sprite(Image("chevron-" + i + ".png").Scale(gs, gs));
+  chevron[i].SetX(gx);
+  chevron[i].SetY(gy);
+  chevron[i].SetZ(3);
+  chevron[i].SetOpacity(0.0);
+}
+
+status.time = 0;
+status.progress = 0;
+status.done = 0;
+status.lit = 0;
+status.fade = 0.0;
+
+fun update_chevrons(count) {
+  for (i = 0; i < 9; i++) {
+    if (i < count) {
+      chevron[i].SetOpacity(1.0);
+    }
+  }
+}
+
+# Boot progress drives the chevrons; time keeps them moving when progress is not reported
+fun refresh_callback() {
+  status.time = status.time + 1;
+  timed = Math.Int(status.time / 40);
+  if (timed > 7) {
+    timed = 7;
+  }
+  byprogress = Math.Int(status.progress * 9);
+  count = Math.Max(timed, byprogress);
+  if (status.done == 1) {
+    count = 9;
+  }
+  if (count > 9) {
+    count = 9;
+  }
+  if (count > status.lit) {
+    status.lit = count;
+    update_chevrons(count);
+  }
+  # Event horizon opens after the 7th chevron locks, then pulses
+  if (status.lit >= 7) {
+    status.fade = status.fade + 0.02;
+    if (status.fade > 1.0) {
+      status.fade = 1.0;
+    }
+    pulse = 0.82 + 0.18 * Math.Sin(status.time / 12.0);
+    horizon.SetOpacity(status.fade * pulse * 0.85);
+  }
+}
+Plymouth.SetRefreshFunction(refresh_callback);
+
+fun boot_progress_callback(time, progress) {
+  status.progress = progress;
+}
+Plymouth.SetBootProgressFunction(boot_progress_callback);
+
+fun quit_callback() {
+  status.done = 1;
+  refresh_callback();
+  horizon.SetOpacity(1.0);
+}
+Plymouth.SetQuitFunction(quit_callback);
+
+# Messages and disk passphrase prompt
+message_sprite = Sprite();
+message_sprite.SetPosition(sw / 2, sh - 60, 10);
+
+fun display_message_callback(text) {
+  img = Image.Text(text, 0.5, 0.8, 1.0);
+  message_sprite.SetImage(img);
+  message_sprite.SetX(sw / 2 - img.GetWidth() / 2);
+}
+fun hide_message_callback(text) {
+  message_sprite.SetImage(Image.Text(" ", 1, 1, 1));
+}
+Plymouth.SetDisplayMessageFunction(display_message_callback);
+Plymouth.SetHideMessageFunction(hide_message_callback);
+
+prompt_sprite = Sprite();
+bullet_sprite = Sprite();
+
+fun display_password_callback(prompt, bullets) {
+  img = Image.Text("ENTER PASSPHRASE", 0.5, 0.8, 1.0);
+  prompt_sprite.SetImage(img);
+  prompt_sprite.SetPosition(sw / 2 - img.GetWidth() / 2, sh - 120, 10);
+  dots = "";
+  for (i = 0; i < bullets; i++) {
+    dots = dots + "*";
+  }
+  bimg = Image.Text(dots, 0.75, 0.9, 1.0);
+  bullet_sprite.SetImage(bimg);
+  bullet_sprite.SetPosition(sw / 2 - bimg.GetWidth() / 2, sh - 90, 10);
+}
+fun display_normal_callback() {
+  prompt_sprite.SetImage(Image.Text(" ", 1, 1, 1));
+  bullet_sprite.SetImage(Image.Text(" ", 1, 1, 1));
+}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+Plymouth.SetDisplayNormalFunction(display_normal_callback);
