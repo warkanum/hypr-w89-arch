@@ -117,6 +117,18 @@ def zsh():
     os.makedirs(os.path.dirname(out), exist_ok=True)
     open(out, "w").write("\n".join(lines) + "\n")
     print(f"zsh: {out}")
+    # Install the prompt themes where Oh-My-Zsh looks first, so ZSH_THEME resolves
+    import glob
+    import shutil
+    custom = os.environ.get("ZSH_CUSTOM") or f"{home}/.oh-my-zsh/custom"
+    if os.path.isdir(f"{home}/.oh-my-zsh"):
+        os.makedirs(f"{custom}/themes", exist_ok=True)
+        for f in glob.glob(f"{here}/../add_zsh_theme/*.zsh-theme"):
+            if os.path.basename(f) in ("stargate.zsh-theme", "lcars.zsh-theme", "stargate-minimal.zsh-theme"):
+                shutil.copy(f, f"{custom}/themes/")
+        print(f"zsh: prompt themes installed in {custom}/themes")
+    else:
+        print("zsh: ~/.oh-my-zsh not found; install the zsh option first, then re-run")
     theme = os.environ.get("HW_ZSH_THEME")
     zrc = f"{home}/.zshrc"
     if theme and os.path.isfile(zrc):

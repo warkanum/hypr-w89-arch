@@ -113,6 +113,9 @@ done
 # copy additional oh-my-zsh themes from assets
 if [ -d "$HOME/.oh-my-zsh/themes" ]; then
     cp -r assets/add_zsh_theme/* ~/.oh-my-zsh/themes >> "$LOG" 2>&1
+    # custom/themes is searched first and survives Oh-My-Zsh updates
+    mkdir -p "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes"
+    cp assets/add_zsh_theme/{stargate,lcars,stargate-minimal}.zsh-theme "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/" >> "$LOG" 2>&1
 fi
 
 # Default prompt colours from the default scheme
