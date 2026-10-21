@@ -71,6 +71,7 @@ if [ -z "$scheme" ] || [ $((t_kitty + t_gtk + t_kde + t_sddm + t_hypr + t_wall))
   fi
 fi
 
+[ -f "$themes/$scheme.json" ] || { [ -f "$themes/$scheme-dark.json" ] && scheme="$scheme-dark"; }
 file="$themes/$scheme.json"
 [ -f "$file" ] || { echo "Unknown scheme: $scheme (see: $0 --list)" >&2; exit 1; }
 [ $((t_kitty + t_gtk + t_kde + t_sddm + t_hypr + t_wall)) -gt 0 ] || { echo "No targets selected."; exit 0; }

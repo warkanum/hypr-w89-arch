@@ -7,7 +7,7 @@
   - Terminal art option is now `star_lore` ([fastfetch-star-lore](https://github.com/warkanum/fastfetch-star-lore)), limited to Stargate and Star Trek
   - Removed legacy colorscript option and its config
   - SDDM theme replaced by bundled local Stargate theme (`assets/sddm-stargate`): chevron dialling sequence on login, event horizon on success
-  - Hyprland theme overlay (`install-scripts/hypr_theme.sh`, runs after the dots): 15 wallust colour schemes (default `stargate-carbon`: carbon black + Stargate blue; Stargate, Atlantis, Goa'uld, Wraith, Replicator, Ancient, LCARS, Starfleet, Vulcan, Klingon, Romulan, Borg, Section 31), `hypr-theme` switcher, stock wallpapers removed, Wallpaper-Bank download blocked. Wallpaper prompts in `assets/hypr-themes/WALLPAPERS.md`.
+  - Hyprland theme overlay (`install-scripts/hypr_theme.sh`, runs after the dots): 15 wallust colour schemes (default `stargate-carbon-dark`: carbon black + Stargate blue; Stargate, Atlantis, Goa'uld, Wraith, Replicator, Ancient, LCARS, Starfleet, Vulcan, Klingon, Romulan, Borg, Section 31), `hypr-theme` switcher, stock wallpapers removed, Wallpaper-Bank download blocked. Wallpaper prompts in `assets/hypr-themes/WALLPAPERS.md`.
   - Removed Japanese-themed wlogout presets (sekiro, kurenai, fuji)
   - KDE option (`kde.sh`): Dolphin and KDE apps, Breeze, KDE portal, Qt platform theme `kde`; `hypr-theme` generates KDE colour schemes from the palettes
   - Boot chain option (`boot_theme.sh`): Plymouth Stargate splash + GRUB theme, with backups and `--revert`
@@ -16,6 +16,7 @@
   - Thumbnail support for Dolphin (kio-extras, ffmpegthumbs, kimageformats, ...) and Thunar (tumbler plugins)
   - Standalone `sddm-theme.sh` (set/test/remove/status) with `--scheme`, `--background`, `--kitty`, `--wallpapers`
   - `theme.sh`: choose scheme and targets (kitty, GTK, KDE, SDDM, Hyprland, wallpapers); `HYPR_THEME_NO_KDE` lets `hypr-theme` skip KDE colours
+  - Schemes renamed with a `-dark` suffix (old names still resolve); new dark Stargate variants: `stargate-oled-dark`, `stargate-gunmetal-dark`, `stargate-midnight-dark`, `atlantis-abyss-dark`
   - SDDM preview keys: `Ctrl+Shift+O` (open gate/splash), `Ctrl+Shift+F` (failed dial).
 
 ## Oct 2026

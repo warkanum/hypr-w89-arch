@@ -22,7 +22,7 @@ fi
 LOG="Install-Logs/install-$(date +%d-%H%M%S)_hypr_theme.log"
 src="assets/hypr-themes"
 share="$HOME/.local/share/hypr-themes"
-default_theme="stargate-carbon"
+default_theme="stargate-carbon-dark"
 
 if [ ! -d "$src" ]; then
   echo "${ERROR} $src not found. Run this script from the repo root." 2>&1 | tee -a "$LOG"
@@ -100,6 +100,16 @@ LUA
   "kbuildsycoca6",' "$us"
   fi
   echo "${OK} KDE mode: Qt platform theme = kde, file manager = dolphin." 2>&1 | tee -a "$LOG"
+fi
+
+# Saved theme from an older install used names without -dark: map it, or wallust cs fails
+saved="$HOME/.local/state/hypr/global_theme"
+if [ -f "$saved" ]; then
+  cur="$(tr -d '\r\n' < "$saved")"
+  if [ -n "$cur" ] && [ ! -f "$share/$cur.json" ] && [ -f "$share/$cur-dark.json" ]; then
+    printf '%s\n' "$cur-dark" > "$saved"
+    printf '%s\n' "$cur-dark" > "$HOME/.cache/.global_theme"
+  fi
 fi
 
 # Apply the default scheme

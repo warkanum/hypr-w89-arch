@@ -35,7 +35,7 @@ Only the block between `hypr-w89 theme begin/end` in the gtk.css files is rewrit
 |---|---|
 | `--scheme NAME` | SDDM accent + gate colour from a palette |
 | `--background NAME\|FILE` | Background image (bundled or path) |
-| `--kitty` | Write + select a kitty theme from `--scheme` (default `stargate-carbon`) |
+| `--kitty` | Write + select a kitty theme from `--scheme` (default `stargate-carbon-dark`) |
 | `--wallpapers [DIR]` | Copy bundled wallpapers (default `~/Pictures/wallpapers`, existing files kept) |
 | `--theme-dir DIR` | Theme source |
 
@@ -80,25 +80,31 @@ Keys are visual only; they never log in.
 ## Hyprland theme (`assets/hypr-themes`)
 
 Runs after the dots (`install-scripts/hypr_theme.sh`):
-installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout presets (sekiro, kurenai, fuji), blocks the Wallpaper-Bank download, pins `stargate-carbon`.
+installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout presets (sekiro, kurenai, fuji), blocks the Wallpaper-Bank download, pins `stargate-carbon-dark`.
 
 | Scheme | Look |
 |---|---|
-| `stargate-carbon` | Carbon black + Stargate blue (default) |
-| `stargate-blue` | Event-horizon blue on deep navy |
+| `stargate-carbon-dark` | Carbon black + Stargate blue (default) |
+| `stargate-blue-dark` | Event-horizon blue on deep navy |
 | `stargate-dark` | Dark grey stone, steel-blue accent |
-| `atlantis-teal` | Pegasus ocean teal |
-| `ancient-aurora` | Ancient outpost green / violet aurora |
-| `goauld-gold` | Gold on black |
-| `wraith-hive` | Toxic green, amber |
-| `replicator-silver` | Cold silver-grey |
-| `star-trek-lcars` | Orange / peach / violet on black |
-| `starfleet-blue` | Command gold, science blue, ops red |
-| `vulcan-amber` | Desert amber |
-| `klingon-red` | Blood red on black |
-| `romulan-green` | Dark green |
-| `borg-collective` | Terminal green on black |
-| `section-31` | Near-black, muted steel |
+| `atlantis-teal-dark` | Pegasus ocean teal |
+| `ancient-aurora-dark` | Ancient outpost green / violet aurora |
+| `goauld-gold-dark` | Gold on black |
+| `wraith-hive-dark` | Toxic green, amber |
+| `replicator-silver-dark` | Cold silver-grey |
+| `star-trek-lcars-dark` | Orange / peach / violet on black |
+| `starfleet-blue-dark` | Command gold, science blue, ops red |
+| `vulcan-amber-dark` | Desert amber |
+| `klingon-red-dark` | Blood red on black |
+| `romulan-green-dark` | Dark green |
+| `borg-collective-dark` | Terminal green on black |
+| `section-31-dark` | Near-black, muted steel |
+| `stargate-oled-dark` | Pure black `#000`, Stargate blue accent |
+| `stargate-gunmetal-dark` | Gunmetal surfaces, ice-blue accent |
+| `stargate-midnight-dark` | Very dark navy, event-horizon blue |
+| `atlantis-abyss-dark` | Near-black, deep ocean teal |
+
+All schemes are dark; names end in `-dark`. Old names (e.g. `stargate-blue`) still resolve to the `-dark` file.
 
 | Command | Does |
 |---|---|

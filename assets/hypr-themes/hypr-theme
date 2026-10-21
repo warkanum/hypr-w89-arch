@@ -16,6 +16,7 @@ case "$1" in
     ;;
   set)
     name="$2"
+    [ -f "$share/$name.json" ] || { [ -f "$share/$name-dark.json" ] && name="$name-dark"; }
     [ -f "$share/$name.json" ] || { echo "Unknown theme: $name (try: hypr-theme list)" >&2; exit 1; }
     mkdir -p "$schemes" "$state"
     cp -f "$share/$name.json" "$schemes/$name.json"

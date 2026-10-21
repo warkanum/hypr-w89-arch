@@ -60,8 +60,9 @@ current_theme() {
 
 scheme_file() { echo "$themes/$1.json"; }
 
+[ -n "$scheme" ] && [ ! -f "$(scheme_file "$scheme")" ] && [ -f "$(scheme_file "$scheme-dark")" ] && scheme="$scheme-dark"
 # Resolve --scheme and --background up front so mistakes fail before anything is changed
-if [ "$kitty" -eq 1 ] && [ -z "$scheme" ]; then scheme="stargate-carbon"; fi
+if [ "$kitty" -eq 1 ] && [ -z "$scheme" ]; then scheme="stargate-carbon-dark"; fi
 if [ -n "$scheme" ] && [ ! -f "$(scheme_file "$scheme")" ]; then
   echo "Unknown scheme: $scheme (see: $0 schemes)" >&2; exit 1
 fi
