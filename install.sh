@@ -157,6 +157,7 @@ execute_script() {
 gtk_themes="OFF"
 bluetooth="OFF"
 thunar="OFF"
+kde="OFF"
 sddm="OFF"
 sddm_theme="OFF"
 zsh="OFF"
@@ -289,9 +290,10 @@ fi
 
 # Add the remaining static options
 options_command+=(
-  "gtk_themes" "Install GTK themes? (required for Dark/Light function)" "OFF"
+  "gtk_themes" "Install minimal GTK themes? (GTK apps only; required for Dark/Light function)" "OFF"
   "bluetooth" "Do you want script to configure Bluetooth?" "OFF"
   "thunar" "Do you want Thunar file manager to be installed?" "OFF"
+  "kde" "Install KDE apps (Dolphin, Breeze, KDE portal) and theme Qt with KDE?" "OFF"
   "zsh" "Install zsh shell with Oh-My-Zsh?" "OFF"
   "star_lore" "Add Stargate/Star Trek fastfetch art (fastfetch-star-lore)?" "OFF"
   "rog" "Are you installing on Asus ROG laptops?" "OFF"
@@ -511,6 +513,10 @@ for option in "${options[@]}"; do
   star_lore)
     echo "${INFO} Adding ${SKY_BLUE}fastfetch-star-lore to terminal...${RESET}" | tee -a "$LOG"
     execute_script "zsh_star_lore.sh"
+    ;;
+  kde)
+    echo "${INFO} Installing ${SKY_BLUE}KDE apps...${RESET}" | tee -a "$LOG"
+    execute_script "kde.sh"
     ;;
   rog)
     echo "${INFO} Installing ${SKY_BLUE}ROG laptop packages...${RESET}" | tee -a "$LOG"

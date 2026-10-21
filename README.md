@@ -24,7 +24,8 @@ Stargate / Star Trek themed Arch Linux Hyprland installer.
 | `sddm_theme` | Bundled Qt6 Stargate login theme -> `/usr/share/sddm/themes/stargate` |
 | `dots` | Clones LinuxBeginnings/Hyprland-Dots, then applies the theme overlay |
 | `star_lore` | [fastfetch-star-lore](https://github.com/warkanum/fastfetch-star-lore), Stargate + Star Trek only |
-| `gtk_themes` | Upstream Flat-Remix GTK themes + Bibata cursor (audited, neutral) |
+| `kde` | Dolphin + KDE apps, Breeze, KDE portal; Qt themed with KDE (replaces Thunar/Fusion) |
+| `gtk_themes` | Minimal GTK: Flat-Remix + Bibata cursor, for GTK apps only (audited, neutral) |
 
 Other options (sddm, zsh, bluetooth, thunar, nvidia, rog, ags, quickshell) are unchanged from upstream.
 
@@ -73,11 +74,20 @@ installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout p
 - Wallpapers: `assets/hypr-themes/wallpapers/` -> `~/Pictures/wallpapers`.
 - Missing: Star Trek wallpapers. Prompts in `assets/hypr-themes/WALLPAPERS.md`.
 
+## KDE mode (`install-scripts/kde.sh` + `hypr_theme.sh`)
+
+- Installs dolphin, ark, kio-extras, gwenview, okular, kate, breeze, plasma-integration, xdg-desktop-portal-kde.
+- Dolphin = default file manager; KDE file chooser portal.
+- After the dots: `QT_QPA_PLATFORMTHEME=kde`, Fusion override removed, `files = dolphin`.
+- `hypr-theme set` also writes `~/.local/share/color-schemes/<name>.colors` and merges it into `~/.config/kdeglobals` (Breeze style, breeze-dark icons).
+- Select `kde` before `dots` (menu order does this).
+
 ## Known gaps
 
 - `auto-install.sh` still clones the upstream repo (LinuxBeginnings/Arch-Hyprland).
 - Hyprlock uses the current wallpaper; swaync, ags and quickshell audited, no anime content.
 - Remaining wlogout presets: default, silvia (nebula), hadi493, BlueBerries (neon street).
+- GTK apps (browsers etc.) are not KDE-themed; GTK pack is kept minimal.
 - Install scripts verified with `bash -n` only; full install not yet run.
 
 See `CHANGELOGS.md`.

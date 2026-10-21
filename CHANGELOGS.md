@@ -9,6 +9,7 @@
   - SDDM theme replaced by bundled local Stargate theme (`assets/sddm-stargate`): chevron dialling sequence on login, event horizon on success
   - Hyprland theme overlay (`install-scripts/hypr_theme.sh`, runs after the dots): 15 wallust colour schemes (default `stargate-carbon`: carbon black + Stargate blue; Stargate, Atlantis, Goa'uld, Wraith, Replicator, Ancient, LCARS, Starfleet, Vulcan, Klingon, Romulan, Borg, Section 31), `hypr-theme` switcher, stock wallpapers removed, Wallpaper-Bank download blocked. Wallpaper prompts in `assets/hypr-themes/WALLPAPERS.md`.
   - Removed Japanese-themed wlogout presets (sekiro, kurenai, fuji)
+  - KDE option (`kde.sh`): Dolphin and KDE apps, Breeze, KDE portal, Qt platform theme `kde`; `hypr-theme` generates KDE colour schemes from the palettes
   - SDDM preview keys: `Ctrl+Shift+O` (open gate/splash), `Ctrl+Shift+F` (failed dial).
 
 ## Oct 2026

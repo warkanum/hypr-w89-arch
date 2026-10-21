@@ -31,7 +31,7 @@ fi
 
 # Schemes + switcher
 mkdir -p "$share" "$HOME/.local/bin" "$HOME/.config/wallust/colorschemes" "$HOME/.local/state/hypr"
-cp -f "$src"/*.json "$share/"
+cp -f "$src"/*.json "$src/kde-colors.py" "$share/"
 cp -f "$src"/*.json "$HOME/.config/wallust/colorschemes/"
 install -m 755 "$src/hypr-theme" "$HOME/.local/bin/hypr-theme"
 echo "${OK} Installed colour schemes and hypr-theme." 2>&1 | tee -a "$LOG"
@@ -63,6 +63,20 @@ wl="$HOME/.config/hypr/scripts/RofiWlogoutTheme.sh"
 if [ -f "$wl" ]; then
   sed -i -e '/Sekiro (Sumi-e/d' -e '/Kurenai (Crimson/d' -e '/Fuji (Mount/d' \
          -e 's/Silvia (Sakura Pink)/Silvia (Nebula)/' "$wl"
+fi
+
+# KDE mode: when Dolphin is installed, make Qt use the KDE platform theme and Dolphin the default
+if command -v dolphin >/dev/null 2>&1; then
+  envlua="$HOME/.config/hypr/lua/env.lua"
+  if [ -f "$envlua" ]; then
+    sed -i -e 's/hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")/hl.env("QT_QPA_PLATFORMTHEME", "kde")/' \
+           -e '/hl.env("QT_STYLE_OVERRIDE", "Fusion")/d' "$envlua"
+  fi
+  ud="$HOME/.config/hypr/UserConfigs/user_defaults.lua"
+  if [ -f "$ud" ] && ! grep -q '^KOOLDOTS_DEFAULTS.files' "$ud"; then
+    echo 'KOOLDOTS_DEFAULTS.files = "dolphin"' >> "$ud"
+  fi
+  echo "${OK} KDE mode: Qt platform theme = kde, file manager = dolphin." 2>&1 | tee -a "$LOG"
 fi
 
 # Apply the default scheme
