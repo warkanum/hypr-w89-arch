@@ -27,6 +27,8 @@ kde=(
   kate
   xdg-desktop-portal-kde
   qt6-wayland
+  kded
+  kglobalacceld
   archlinux-xdg-menu
   udisks2
   kwallet

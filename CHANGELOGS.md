@@ -11,7 +11,7 @@
   - Removed Japanese-themed wlogout presets (sekiro, kurenai, fuji)
   - KDE option (`kde.sh`): Dolphin and KDE apps, Breeze, KDE portal, Qt platform theme `kde`; `hypr-theme` generates KDE colour schemes from the palettes
   - Boot chain option (`boot_theme.sh`): Plymouth Stargate splash + GRUB theme, with backups and `--revert`
-  - KDE integration: KDE portal for file/app/print/settings dialogs, default KDE apps per mime type, qt6-wayland, udisks2, XDG menu cache, D-Bus activation env, Firefox/Chromium dialogs via KDE portal
+  - KDE integration: KDE portal for file/app/print/settings dialogs, default KDE apps per mime type, qt6-wayland, udisks2, XDG menu cache, D-Bus activation env, kded6, kglobalacceld, Firefox/Chromium dialogs via KDE portal
   - SDDM preview keys: `Ctrl+Shift+O` (open gate/splash), `Ctrl+Shift+F` (failed dial).
 
 ## Oct 2026

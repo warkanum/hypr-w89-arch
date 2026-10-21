@@ -96,6 +96,7 @@ LUA
     sed -i '/^local startup_commands = {/a\
   -- hypr-w89 kde\
   "dbus-update-activation-environment --systemd QT_QPA_PLATFORMTHEME XDG_MENU_PREFIX KDE_SESSION_VERSION GTK_USE_PORTAL",\
+  "kded6",\
   "kbuildsycoca6",' "$us"
   fi
   echo "${OK} KDE mode: Qt platform theme = kde, file manager = dolphin." 2>&1 | tee -a "$LOG"
