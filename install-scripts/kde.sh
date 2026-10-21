@@ -76,9 +76,23 @@ else
   echo "${WARN} /etc/pam.d/sddm has no pam_kwallet5 lines; KWallet will not auto-unlock at login." | tee -a "$LOG"
 fi
 
-# Both wallets provide org.freedesktop.secrets; only one can own it
+# Both wallets provide org.freedesktop.secrets; only one can own it. KWallet wins.
 if pacman -Qq gnome-keyring >/dev/null 2>&1; then
-  echo "${WARN} gnome-keyring is installed and competes with KWallet for org.freedesktop.secrets. Remove it if KWallet should be the only secret service." | tee -a "$LOG"
+  echo "${NOTE} Removing ${YELLOW}gnome-keyring${RESET} so KWallet owns org.freedesktop.secrets..." | tee -a "$LOG"
+  if sudo pacman -Rns --noconfirm gnome-keyring 2>&1 | tee -a "$LOG" | grep -q "^error"; then
+    # Another package depends on it: keep it installed but disable it and point D-Bus at KWallet
+    echo "${WARN} gnome-keyring is required by another package; disabling it instead." | tee -a "$LOG"
+    systemctl --user mask gnome-keyring-daemon.service gnome-keyring-daemon.socket 2>&1 | tee -a "$LOG" || true
+    mkdir -p "$HOME/.local/share/dbus-1/services"
+    cat > "$HOME/.local/share/dbus-1/services/org.freedesktop.secrets.service" <<'DBUS'
+[D-BUS Service]
+Name=org.freedesktop.secrets
+Exec=/usr/bin/kwalletd6
+DBUS
+    echo "${OK} gnome-keyring disabled; D-Bus secrets now start kwalletd6." | tee -a "$LOG"
+  else
+    echo "${OK} gnome-keyring removed." | tee -a "$LOG"
+  fi
 fi
 
 echo "${NOTE} Qt env + colours are applied by hypr_theme.sh (runs after the dots)." | tee -a "$LOG"

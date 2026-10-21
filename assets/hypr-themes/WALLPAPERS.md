@@ -18,3 +18,22 @@ Size: 2560x1440 (16:9), PNG. Shared constraints for every prompt: no text, no lo
 | `starfleet-2.png` | Starfleet blue | Starship warp streaks through a blue nebula, command-gold glints, dark negative space on the left |
 
 Colour schemes live in `assets/hypr-themes/*.json`; wallpapers are independent of the active scheme.
+
+## Generation status (2026-10-21)
+
+Generated with the built-in imagegen tool and saved in `wallpapers/`:
+`stargate-blue-1.png`, `stargate-blue-2.png`, `stargate-dark-1.png`,
+`stargate-dark-2.png`, `atlantis-1.png`, `lcars-1.png`, and `lcars-2.png`.
+All seven are PNGs at 2560×1440. The tool returned 1672×941 originals;
+ImageMagick resized them to cover and centre-cropped to the required dimensions.
+
+The prompt set is the corresponding seven rows above, with the shared constraints
+and a request for a single wide desktop wallpaper with dark breathing room.
+The scenic prompts used cinematic realistic science-fiction styling. The glyph
+close-up specified fictional pictograms rather than readable lettering. LCARS
+panels used abstract shapes without labels, digits, icons, or desktop/app chrome;
+the first LCARS image keeps its centre empty and its bars near the edges.
+
+Still missing: `starfleet-1.png` and `starfleet-2.png`. The image tool rejected
+both scenes at output moderation, including retries using the original prompts.
+No placeholder files were added.

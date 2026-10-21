@@ -72,12 +72,12 @@ installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout p
 | `hypr-theme set <name>` | Apply to waybar, rofi, kitty, hyprland, etc. |
 
 - Wallpapers: `assets/hypr-themes/wallpapers/` -> `~/Pictures/wallpapers`.
-- Missing: Star Trek wallpapers. Prompts in `assets/hypr-themes/WALLPAPERS.md`.
+- Includes Stargate, Atlantis, dark-grey, and LCARS wallpapers. The two Starfleet wallpapers remain missing; prompts and generation status are in `assets/hypr-themes/WALLPAPERS.md`.
 
 ## KDE mode (`install-scripts/kde.sh` + `hypr_theme.sh`)
 
 - Also: kwallet + kwallet-pam (auto-unlock via SDDM PAM, needs wallet password = login password), kwalletmanager, ksshaskpass (`SSH_ASKPASS`), kdeconnect, kcalc, kdialog, kfind, filelight, partitionmanager.
-- Warns if gnome-keyring is installed (both claim `org.freedesktop.secrets`).
+- Removes gnome-keyring (both claim `org.freedesktop.secrets`). If another package requires it, it is masked instead and D-Bus is pointed at `kwalletd6`.
 - Installs dolphin, ark, kio-extras, gwenview, okular, kate, breeze, plasma-integration, xdg-desktop-portal-kde.
 - Dolphin = default file manager; KDE file chooser portal.
 - After the dots: `QT_QPA_PLATFORMTHEME=kde`, Fusion override removed, `files = dolphin`.
