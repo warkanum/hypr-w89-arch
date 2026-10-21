@@ -17,13 +17,16 @@ here = os.path.dirname(os.path.abspath(__file__))
 
 
 def kitty():
-    out_dir = f"{home}/.config/hypr/UserConfigs/kitty-themes"
-    kconf = f"{home}/.config/hypr/UserConfigs/kitty.conf"
-    if not os.path.isfile(kconf):
-        out_dir, kconf = f"{home}/.config/kitty/themes", f"{home}/.config/kitty/kitty.conf"
-    os.makedirs(out_dir, exist_ok=True)
-    os.makedirs(os.path.dirname(kconf), exist_ok=True)
-    theme = f"{out_dir}/{name}.conf"
+    # Update every kitty.conf that may be in use: $KITTY_CONFIG_DIRECTORY, the default
+    # ~/.config/kitty, and the dots' UserConfigs copy.
+    candidates = []
+    env_dir = os.environ.get("KITTY_CONFIG_DIRECTORY")
+    if env_dir:
+        candidates.append(f"{env_dir}/kitty.conf")
+    candidates += [f"{home}/.config/kitty/kitty.conf", f"{home}/.config/hypr/UserConfigs/kitty.conf"]
+    confs = [f for f in dict.fromkeys(candidates) if os.path.isfile(f)]
+    if not confs:
+        confs = [f"{home}/.config/kitty/kitty.conf"]
     lines = [
         f"foreground {s['foreground']}", f"background {s['background']}", f"cursor {s['cursor']}",
         f"selection_foreground {s['background']}", f"selection_background {s['foreground']}",
@@ -31,15 +34,21 @@ def kitty():
         f"inactive_tab_foreground {s['foreground']}", f"inactive_tab_background {c['color0']}",
         f"active_border_color {s['cursor']}", f"inactive_border_color {c['color8']}",
     ] + [f"color{i} {c['color%d' % i]}" for i in range(16)]
-    open(theme, "w").write("\n".join(lines) + "\n")
-    text = open(kconf).read() if os.path.isfile(kconf) else ""
     pat = re.compile(r"^include .*themes/[^/\n]*\.conf$", re.M)
-    if pat.search(text):
-        text = pat.sub(f"include {theme}", text, count=1)
-    else:
-        text += f"\ninclude {theme}\n"
-    open(kconf, "w").write(text)
-    print(f"kitty: {theme} selected in {kconf} (ctrl+shift+f5 reloads open windows)")
+    for kconf in confs:
+        out_dir = os.path.join(os.path.dirname(kconf), "kitty-themes")
+        os.makedirs(out_dir, exist_ok=True)
+        theme = f"{out_dir}/{name}.conf"
+        open(theme, "w").write("\n".join(lines) + "\n")
+        text = open(kconf).read() if os.path.isfile(kconf) else ""
+        if pat.search(text):
+            text = pat.sub(lambda m: f"include {theme}", text, count=1)
+        else:
+            text += f"\ninclude {theme}\n"
+        open(kconf, "w").write(text)
+        print(f"kitty: {theme} selected in {kconf}")
+    # kitty reloads its config on SIGUSR1
+    subprocess.run(["pkill", "-USR1", "-x", "kitty"], check=False, stderr=subprocess.DEVNULL)
 
 
 def gtk():
