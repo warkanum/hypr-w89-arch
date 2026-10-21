@@ -160,6 +160,7 @@ execute_script() {
 
 ## Default values for the options (will be overwritten by preset file if available)
 gtk_themes="OFF"
+gtk_murrine="OFF"
 bluetooth="OFF"
 thunar="OFF"
 kde="OFF"
@@ -297,6 +298,7 @@ fi
 # Add the remaining static options
 options_command+=(
   "gtk_themes" "Install minimal GTK themes? (GTK apps only; required for Dark/Light function)" "OFF"
+  "gtk_murrine" "Also install gtk-engine-murrine? (AUR, builds gtk2 from source: slow; only for old GTK2 themes; needs gtk_themes)" "OFF"
   "bluetooth" "Do you want script to configure Bluetooth?" "OFF"
   "thunar" "Do you want Thunar file manager to be installed?" "OFF"
   "kde" "Install KDE apps (Dolphin, Breeze, KDE portal) and theme Qt with KDE?" "OFF"
@@ -494,7 +496,12 @@ for option in "${options[@]}"; do
     ;;
   gtk_themes)
     echo "${INFO} Installing ${SKY_BLUE}GTK themes...${RESET}" | tee -a "$LOG"
-    execute_script "gtk_themes.sh"
+    GTK_MURRINE="OFF"
+    [[ " ${options[*]} " == *" gtk_murrine "* ]] && GTK_MURRINE="ON"
+    GTK_MURRINE="$GTK_MURRINE" execute_script "gtk_themes.sh"
+    ;;
+  gtk_murrine)
+    # handled inside gtk_themes
     ;;
   input_group)
     echo "${INFO} Adding user into ${SKY_BLUE}input group...${RESET}" | tee -a "$LOG"

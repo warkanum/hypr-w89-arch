@@ -10,8 +10,12 @@
 
 engine=(
     unzip
-    gtk-engine-murrine
 )
+
+# gtk-engine-murrine pulls gtk2 from the AUR (long source build), so it is opt-in
+if [ "${GTK_MURRINE:-OFF}" = "ON" ]; then
+    engine+=(gtk-engine-murrine)
+fi
 
 ## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
