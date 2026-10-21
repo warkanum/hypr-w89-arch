@@ -4,24 +4,15 @@ Stargate / Star Trek themed Arch Linux Hyprland installer.
 
 **Credit:** fork of [LinuxBeginnings/Arch-Hyprland](https://github.com/LinuxBeginnings/Arch-Hyprland) (KooL's Arch-Hyprland). Licence GPL-3.0 (`LICENSE.md`).
 
-## Pick where a scheme goes: `./theme.sh`
+## Scripts
 
-Interactive (whiptail) when run without arguments; otherwise `./theme.sh --scheme NAME [targets]`.
-
-| Target | Does |
+| Script | Use |
 |---|---|
-| `--kitty` | Kitty theme from the scheme, selected in kitty.conf |
-| `--gtk` | `@define-color` block in `gtk-3.0/gtk.css` + `gtk-4.0/gtk.css`, dark preference. Full effect on GTK4/libadwaita; GTK3 only for themes that use the named colours |
-| `--kde` | KDE/Qt colour scheme into `kdeglobals` (+ `~/.local/share/color-schemes`) |
-| `--zsh [THEME]` | Writes `~/.config/hypr-w89/zsh-colors.zsh` (prompt, autosuggestion and syntax-highlight colours); `THEME` = `stargate`, `lcars` or `stargate-minimal` sets `ZSH_THEME` in `~/.zshrc` |
-| `--sddm` | SDDM theme via `sddm-theme.sh set --scheme` (sudo) |
-| `--hypr` | Hyprland, waybar, rofi via `hypr-theme` (needs the dots) |
-| `--wallpapers [DIR]` | Copy bundled wallpapers (default `~/Pictures/wallpapers`, existing files kept) |
-| `--all` / `--list` | Every target / list schemes |
+| `./install.sh` | Full installer (menu) |
+| `./theme.sh` | Apply one scheme to chosen targets; whiptail menu without arguments, else `--scheme NAME [targets]`. Targets are documented under each section below |
+| `./sddm-theme.sh` | SDDM theme only, no `install.sh` |
 
-zsh themes live in `assets/add_zsh_theme` (copied to `~/.oh-my-zsh/themes` by the zsh option; default `stargate`). They use truecolor hex and fall back to built-in Stargate colours without the colours file. The upstream themes stay installed.
-
-Only the block between `hypr-w89 theme begin/end` in the gtk.css files is rewritten; other content is kept.
+`./theme.sh` flags: `--scheme`, `--kitty`, `--gtk`, `--kde`, `--zsh [THEME]`, `--sddm`, `--hypr`, `--wallpapers [DIR]`, `--all`, `--list`.
 
 ## SDDM theme only: `./sddm-theme.sh` (no `install.sh`)
 
@@ -41,6 +32,8 @@ Only the block between `hypr-w89 theme begin/end` in the gtk.css files is rewrit
 | `--kitty` | Write + select a kitty theme from `--scheme` (default `stargate-carbon-dark`) |
 | `--wallpapers [DIR]` | Copy bundled wallpapers (default `~/Pictures/wallpapers`, existing files kept) |
 | `--theme-dir DIR` | Theme source |
+
+`./theme.sh --sddm` runs `sddm-theme.sh set --scheme` (sudo).
 
 ## Install
 
@@ -115,8 +108,32 @@ All schemes are dark; names end in `-dark`. Old names (e.g. `stargate-blue`) sti
 | `hypr-theme current` | Show active |
 | `hypr-theme set <name>` | Apply to waybar, rofi, kitty, hyprland, etc. |
 
+| `theme.sh` flag | Does |
+|---|---|
+| `--hypr` | `hypr-theme set` for Hyprland, waybar, rofi (needs the dots; KDE colours skipped, use `--kde`) |
+| `--wallpapers [DIR]` | Copy bundled wallpapers (default `~/Pictures/wallpapers`, existing files kept) |
+| `--list` | List schemes |
+| `--all` | Every target |
+
 - Wallpapers: `assets/hypr-themes/wallpapers/` -> `~/Pictures/wallpapers`.
 - Includes Stargate, Atlantis, dark-grey, and LCARS wallpapers. The two Starfleet wallpapers remain missing; prompts and generation status are in `assets/hypr-themes/WALLPAPERS.md`.
+
+## Kitty (`theme.sh --kitty`)
+
+- Writes the scheme as a kitty theme next to every existing `kitty.conf` (`$KITTY_CONFIG_DIRECTORY`, `~/.config/kitty`, hypr `UserConfigs`), repoints the include line, reloads running kitty (SIGUSR1).
+
+## GTK (`theme.sh --gtk`)
+
+- Writes `@define-color` blocks into `gtk-3.0/gtk.css` and `gtk-4.0/gtk.css`, sets dark preference.
+- Full effect on GTK4/libadwaita; GTK3 only for themes using the named colours.
+- Only the block between `hypr-w89 theme begin/end` is rewritten; other content is kept.
+
+## Zsh themes (`assets/add_zsh_theme`, `theme.sh --zsh [THEME]`)
+
+- Prompts: `stargate` (default), `lcars`, `stargate-minimal`; upstream themes stay installed.
+- Installed to `~/.oh-my-zsh/custom/themes` (by `zsh.sh` and `--zsh`).
+- `--zsh` writes `~/.config/hypr-w89/zsh-colors.zsh` (prompt, autosuggestion, syntax-highlight colours, sourced by `.zshrc`); `THEME` also sets `ZSH_THEME` in `~/.zshrc`.
+- Truecolor hex; without the colours file the built-in Stargate colours are used.
 
 ## Boot chain (`assets/boot-stargate`, `install-scripts/boot_theme.sh`)
 
@@ -141,6 +158,7 @@ All schemes are dark; names end in `-dark`. Old names (e.g. `stargate-blue`) sti
 - Services: `kded6` (started with the session), `kglobalacceld` (global shortcuts, D-Bus activated). KDE app notifications go to the running daemon (swaync); KDE's own notification daemon is part of plasma-workspace and is not installed.
 - Env lives in `UserConfigs/user_env.lua` and startup in `UserConfigs/user_startup.lua` (marker `hypr-w89 kde`).
 - After the dots: `QT_QPA_PLATFORMTHEME=kde`, Fusion override removed, `files = dolphin`.
+- `theme.sh --kde` writes the scheme to `~/.local/share/color-schemes` and merges it into `kdeglobals`.
 - `hypr-theme set` also writes `~/.local/share/color-schemes/<name>.colors` and merges it into `~/.config/kdeglobals` (Breeze style, breeze-dark icons).
 - Select `kde` before `dots` (menu order does this).
 
