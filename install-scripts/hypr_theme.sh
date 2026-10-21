@@ -1,0 +1,65 @@
+#!/bin/bash
+# ==================================================
+#  Stargate / Star Trek Hyprland theme overlay
+#  Based on KooL's Arch-Hyprland by LinuxBeginnings
+#  https://github.com/LinuxBeginnings
+#  License: GNU GPLv3
+#  SPDX-License-Identifier: GPL-3.0-or-later
+# ==================================================
+# Runs after dotfiles-main.sh. Adds the colour schemes and the hypr-theme
+# switcher, and removes the stock (anime) wallpapers shipped with the dots.
+
+## WARNING: DO NOT EDIT BEYOND THIS LINE IF YOU DON'T KNOW WHAT YOU ARE DOING! ##
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PARENT_DIR="$SCRIPT_DIR/.."
+cd "$PARENT_DIR" || { echo "${ERROR} Failed to change directory to $PARENT_DIR"; exit 1; }
+
+if ! source "$(dirname "$(readlink -f "$0")")/Global_functions.sh"; then
+  echo "Failed to source Global_functions.sh"
+  exit 1
+fi
+
+LOG="Install-Logs/install-$(date +%d-%H%M%S)_hypr_theme.log"
+src="assets/hypr-themes"
+share="$HOME/.local/share/hypr-themes"
+default_theme="stargate-blue"
+
+if [ ! -d "$src" ]; then
+  echo "${ERROR} $src not found. Run this script from the repo root." 2>&1 | tee -a "$LOG"
+  exit 1
+fi
+
+# Schemes + switcher
+mkdir -p "$share" "$HOME/.local/bin" "$HOME/.config/wallust/colorschemes" "$HOME/.local/state/hypr"
+cp -f "$src"/*.json "$share/"
+cp -f "$src"/*.json "$HOME/.config/wallust/colorschemes/"
+install -m 755 "$src/hypr-theme" "$HOME/.local/bin/hypr-theme"
+echo "${OK} Installed colour schemes and hypr-theme." 2>&1 | tee -a "$LOG"
+
+# Remove the stock wallpapers shipped with Hyprland-Dots (names taken from the cloned dots)
+if [ -d Hyprland-Dots/wallpapers ]; then
+  while IFS= read -r -d '' f; do
+    rm -f "$HOME/Pictures/wallpapers/${f#Hyprland-Dots/wallpapers/}"
+  done < <(find Hyprland-Dots/wallpapers -type f -print0)
+  find "$HOME/Pictures/wallpapers" -type d -empty -delete 2>/dev/null
+  echo "${OK} Removed stock wallpapers." 2>&1 | tee -a "$LOG"
+fi
+
+# Wallpapers supplied by this repo
+if compgen -G "assets/hypr-themes/wallpapers/*" >/dev/null; then
+  mkdir -p "$HOME/Pictures/wallpapers"
+  cp -f assets/hypr-themes/wallpapers/* "$HOME/Pictures/wallpapers/"
+fi
+
+# Dots call `wallust theme` for the saved global theme; ours are colorschemes, so use `wallust cs`
+ws="$HOME/.config/hypr/scripts/WallustSwww.sh"
+if [ -f "$ws" ]; then
+  sed -i 's/ theme -- "\$global_theme"/ cs -- "$global_theme"/' "$ws"
+fi
+
+# Apply the default scheme
+if "$HOME/.local/bin/hypr-theme" set "$default_theme" 2>&1 | tee -a "$LOG"; then
+  echo "${OK} Applied ${SKY_BLUE}$default_theme${RESET}. Switch with: hypr-theme set <name>" 2>&1 | tee -a "$LOG"
+fi
+
+printf "\n%.0s" {1..2}

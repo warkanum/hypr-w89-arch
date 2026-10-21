@@ -1,0 +1,35 @@
+#!/bin/bash
+# hypr-theme: switch the Stargate / Star Trek colour scheme (wallust colorscheme).
+# Usage: hypr-theme list | hypr-theme set <name> | hypr-theme current
+
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
+share="${XDG_DATA_HOME:-$HOME/.local/share}/hypr-themes"
+state="${XDG_STATE_HOME:-$HOME/.local/state}/hypr"
+schemes="$cfg/wallust/colorschemes"
+
+case "$1" in
+  list)
+    for f in "$share"/*.json; do basename "$f" .json; done
+    ;;
+  current)
+    cat "$state/global_theme" 2>/dev/null
+    ;;
+  set)
+    name="$2"
+    [ -f "$share/$name.json" ] || { echo "Unknown theme: $name (try: hypr-theme list)" >&2; exit 1; }
+    mkdir -p "$schemes" "$state"
+    cp -f "$share/$name.json" "$schemes/$name.json"
+    printf '%s\n' "$name" > "$state/global_theme"
+    printf '%s\n' "$name" > "$HOME/.cache/.global_theme"
+    # shellcheck source=/dev/null
+    . "$cfg/hypr/scripts/WallustConfig.sh" 2>/dev/null && wallust_prepare_args
+    wallust "${wallust_args[@]}" cs "$name" -q || exit 1
+    for s in Refresh.sh; do
+      [ -x "$cfg/hypr/scripts/$s" ] && "$cfg/hypr/scripts/$s" >/dev/null 2>&1
+    done
+    ;;
+  *)
+    echo "Usage: hypr-theme list | current | set <name>" >&2
+    exit 1
+    ;;
+esac

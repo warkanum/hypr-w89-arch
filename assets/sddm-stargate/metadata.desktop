@@ -1,0 +1,12 @@
+[SddmGreeterTheme]
+Name=Stargate
+Description=Stargate dialling-sequence login theme
+Author=warkanum
+License=GPL-3.0-or-later
+Type=sddm-theme
+Version=1.0
+ConfigFile=theme.conf
+MainScript=Main.qml
+Theme-Id=stargate
+Theme-API=2.0
+QtVersion=6

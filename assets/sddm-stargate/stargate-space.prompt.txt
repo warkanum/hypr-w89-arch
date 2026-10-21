@@ -1,0 +1,10 @@
+Generated with the built-in image_gen tool.
+
+Use case: stylized-concept
+Asset type: HD widescreen wallpaper for a Stargate SDDM login theme.
+Primary request: A cinematic Stargate floating in deep space, highly detailed, realistic science-fiction concept art.
+Scene/backdrop: vast dark starfield with subtle blue nebula wisps and distant planetary curvature.
+Subject: iconic ancient circular Stargate with engraved alien glyphs, nine chevrons with warm orange illumination, and a luminous rippling blue event horizon.
+Composition/framing: wide 16:9 landscape, request 2560x1440 resolution, complete gate visible with breathing room, restrained detail in surrounding space suitable for a login wallpaper.
+Lighting/mood: atmospheric, majestic, deep near-black space, cool blue light from the wormhole balanced with small warm orange chevron lights; crisp intricate metal textures.
+Constraints: finished background artwork only; no text, no lettering overlay, no logos, no watermark, no user interface, no people.
