@@ -24,7 +24,7 @@ Stargate / Star Trek themed Arch Linux Hyprland installer.
 | `sddm_theme` | Bundled Qt6 Stargate login theme -> `/usr/share/sddm/themes/stargate` |
 | `dots` | Clones LinuxBeginnings/Hyprland-Dots, then applies the theme overlay |
 | `star_lore` | [fastfetch-star-lore](https://github.com/warkanum/fastfetch-star-lore), Stargate + Star Trek only |
-| `gtk_themes` | Upstream GTK themes/icons (not yet audited) |
+| `gtk_themes` | Upstream Flat-Remix GTK themes + Bibata cursor (audited, neutral) |
 
 Other options (sddm, zsh, bluetooth, thunar, nvidia, rog, ags, quickshell) are unchanged from upstream.
 
@@ -44,14 +44,25 @@ Keys are visual only; they never log in.
 ## Hyprland theme (`assets/hypr-themes`)
 
 Runs after the dots (`install-scripts/hypr_theme.sh`):
-installs schemes + `hypr-theme`, removes stock wallpapers, blocks the Wallpaper-Bank download, pins `stargate-blue`.
+installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout presets (sekiro, kurenai, fuji), blocks the Wallpaper-Bank download, pins `stargate-carbon`.
 
 | Scheme | Look |
 |---|---|
-| `stargate-blue` | Event-horizon blue (default) |
+| `stargate-carbon` | Carbon black + Stargate blue (default) |
+| `stargate-blue` | Event-horizon blue on deep navy |
 | `stargate-dark` | Dark grey stone, steel-blue accent |
+| `atlantis-teal` | Pegasus ocean teal |
+| `ancient-aurora` | Ancient outpost green / violet aurora |
+| `goauld-gold` | Gold on black |
+| `wraith-hive` | Toxic green, amber |
+| `replicator-silver` | Cold silver-grey |
 | `star-trek-lcars` | Orange / peach / violet on black |
 | `starfleet-blue` | Command gold, science blue, ops red |
+| `vulcan-amber` | Desert amber |
+| `klingon-red` | Blood red on black |
+| `romulan-green` | Dark green |
+| `borg-collective` | Terminal green on black |
+| `section-31` | Near-black, muted steel |
 
 | Command | Does |
 |---|---|
@@ -65,7 +76,8 @@ installs schemes + `hypr-theme`, removes stock wallpapers, blocks the Wallpaper-
 ## Known gaps
 
 - `auto-install.sh` still clones the upstream repo (LinuxBeginnings/Arch-Hyprland).
-- GTK themes/icons and some upstream dots surfaces (hyprlock, wlogout, swaync, ags, quickshell) are only colour-themed, not audited for anime content.
+- Hyprlock uses the current wallpaper; swaync, ags and quickshell audited, no anime content.
+- Remaining wlogout presets: default, silvia (nebula), hadi493, BlueBerries (neon street).
 - Install scripts verified with `bash -n` only; full install not yet run.
 
 See `CHANGELOGS.md`.

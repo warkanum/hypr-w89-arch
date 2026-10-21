@@ -22,7 +22,7 @@ fi
 LOG="Install-Logs/install-$(date +%d-%H%M%S)_hypr_theme.log"
 src="assets/hypr-themes"
 share="$HOME/.local/share/hypr-themes"
-default_theme="stargate-blue"
+default_theme="stargate-carbon"
 
 if [ ! -d "$src" ]; then
   echo "${ERROR} $src not found. Run this script from the repo root." 2>&1 | tee -a "$LOG"
@@ -55,6 +55,14 @@ fi
 ws="$HOME/.config/hypr/scripts/WallustSwww.sh"
 if [ -f "$ws" ]; then
   sed -i 's/ theme -- "\$global_theme"/ cs -- "$global_theme"/' "$ws"
+fi
+
+# Remove the Japanese-themed wlogout presets (sekiro, kurenai, fuji) and their menu entries
+rm -rf "$HOME/.config/wlogout/themes"/{sekiro,kurenai,fuji}
+wl="$HOME/.config/hypr/scripts/RofiWlogoutTheme.sh"
+if [ -f "$wl" ]; then
+  sed -i -e '/Sekiro (Sumi-e/d' -e '/Kurenai (Crimson/d' -e '/Fuji (Mount/d' \
+         -e 's/Silvia (Sakura Pink)/Silvia (Nebula)/' "$wl"
 fi
 
 # Apply the default scheme
