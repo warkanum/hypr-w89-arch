@@ -26,6 +26,9 @@ kde=(
   okular
   kate
   xdg-desktop-portal-kde
+  qt6-wayland
+  archlinux-xdg-menu
+  udisks2
   kwallet
   kwallet-pam
   kwalletmanager
@@ -59,15 +62,33 @@ done
 xdg-mime default org.kde.dolphin.desktop inode/directory
 echo "${OK} ${MAGENTA}Dolphin${RESET} is now the default file manager." | tee -a "$LOG"
 
-# Portal: KDE file chooser, Hyprland for the rest
+# Default apps (KDE apps open their own file types)
+set_default() { # $1 = desktop file, rest = mime types
+  local app="$1"; shift
+  for m in "$@"; do xdg-mime default "$app" "$m"; done
+}
+set_default org.kde.ark.desktop application/zip application/x-tar application/x-7z-compressed \
+  application/vnd.rar application/gzip application/x-xz application/x-bzip2 application/zstd
+set_default org.kde.gwenview.desktop image/png image/jpeg image/gif image/webp image/bmp image/avif image/svg+xml
+set_default org.kde.okular.desktop application/pdf application/epub+zip
+set_default org.kde.kate.desktop text/plain text/markdown application/json text/x-shellscript text/x-python
+echo "${OK} Default apps set (Dolphin, Ark, Gwenview, Okular, Kate)." | tee -a "$LOG"
+
+# Portals: KDE dialogs (file chooser, app chooser, print, settings), Hyprland for screen sharing
 portals="$HOME/.config/xdg-desktop-portal/hyprland-portals.conf"
 mkdir -p "$(dirname "$portals")"
 cat > "$portals" <<'PORTALS'
 [preferred]
 default=hyprland;gtk
 org.freedesktop.impl.portal.FileChooser=kde
+org.freedesktop.impl.portal.AppChooser=kde
+org.freedesktop.impl.portal.Print=kde
+org.freedesktop.impl.portal.Settings=kde;gtk
 PORTALS
 echo "${OK} Portal config written to $portals" | tee -a "$LOG"
+
+# Application menu cache so "Open with" lists apps outside Plasma
+XDG_MENU_PREFIX=arch- kbuildsycoca6 >/dev/null 2>&1 && echo "${OK} KDE service cache built." | tee -a "$LOG"
 
 # KWallet auto-unlock at SDDM login (pam_kwallet5.so is the module for KWallet 6 as well)
 if [ -f /etc/pam.d/sddm ] && grep -q 'pam_kwallet5.so' /etc/pam.d/sddm; then

@@ -80,6 +80,24 @@ if command -v dolphin >/dev/null 2>&1; then
   if [ -f "$envlua" ] && command -v ksshaskpass >/dev/null 2>&1 && ! grep -q SSH_ASKPASS "$envlua"; then
     printf '%s\n' 'hl.env("SSH_ASKPASS", "/usr/bin/ksshaskpass")' 'hl.env("SSH_ASKPASS_REQUIRE", "prefer")' >> "$envlua"
   fi
+  # Env that survives dots updates, and session startup for KDE apps/portals
+  uenv="$HOME/.config/hypr/UserConfigs/user_env.lua"
+  if [ -f "$uenv" ] && ! grep -q 'hypr-w89 kde' "$uenv"; then
+    cat >> "$uenv" <<'LUA'
+
+-- hypr-w89 kde
+hl.env("XDG_MENU_PREFIX", "arch-")
+hl.env("KDE_SESSION_VERSION", "6")
+hl.env("GTK_USE_PORTAL", "1")
+LUA
+  fi
+  us="$HOME/.config/hypr/UserConfigs/user_startup.lua"
+  if [ -f "$us" ] && ! grep -q 'hypr-w89 kde' "$us"; then
+    sed -i '/^local startup_commands = {/a\
+  -- hypr-w89 kde\
+  "dbus-update-activation-environment --systemd QT_QPA_PLATFORMTHEME XDG_MENU_PREFIX KDE_SESSION_VERSION GTK_USE_PORTAL",\
+  "kbuildsycoca6",' "$us"
+  fi
   echo "${OK} KDE mode: Qt platform theme = kde, file manager = dolphin." 2>&1 | tee -a "$LOG"
 fi
 
