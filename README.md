@@ -4,6 +4,25 @@ Stargate / Star Trek themed Arch Linux Hyprland installer.
 
 **Credit:** fork of [LinuxBeginnings/Arch-Hyprland](https://github.com/LinuxBeginnings/Arch-Hyprland) (KooL's Arch-Hyprland). Licence GPL-3.0 (`LICENSE.md`).
 
+## SDDM theme only: `./sddm-theme.sh` (no `install.sh`)
+
+`./sddm-theme.sh <command> [options]`
+
+| Command | Does |
+|---|---|
+| `set` | Install + activate (default) |
+| `test` | Preview window, installs nothing |
+| `remove` | Delete theme, restore config |
+| `status` / `schemes` / `backgrounds` | Show active theme / list schemes / list backgrounds |
+
+| Option | Does |
+|---|---|
+| `--scheme NAME` | SDDM accent + gate colour from a palette |
+| `--background NAME\|FILE` | Background image (bundled or path) |
+| `--kitty` | Write + select a kitty theme from `--scheme` (default `stargate-carbon`) |
+| `--wallpapers [DIR]` | Copy bundled wallpapers (default `~/Pictures/wallpapers`, existing files kept) |
+| `--theme-dir DIR` | Theme source |
+
 ## Install
 
 | Step | Command |
@@ -41,23 +60,6 @@ Other options (sddm, zsh, bluetooth, thunar, nvidia, rog, ags, quickshell) are u
 | `Ctrl+Shift+F` | Play failed dial |
 
 Keys are visual only; they never log in.
-
-Standalone script (no `install.sh`): `./sddm-theme.sh <command> [options]`
-
-| Command | Does |
-|---|---|
-| `set` | Install + activate (default) |
-| `test` | Preview window, installs nothing |
-| `remove` | Delete theme, restore config |
-| `status` / `schemes` / `backgrounds` | Show active theme / list schemes / list backgrounds |
-
-| Option | Does |
-|---|---|
-| `--scheme NAME` | SDDM accent + gate colour from a palette |
-| `--background NAME\|FILE` | Background image (bundled or path) |
-| `--kitty` | Write + select a kitty theme from `--scheme` (default `stargate-carbon`) |
-| `--wallpapers [DIR]` | Copy bundled wallpapers (default `~/Pictures/wallpapers`, existing files kept) |
-| `--theme-dir DIR` | Theme source |
 
 ## Hyprland theme (`assets/hypr-themes`)
 
