@@ -91,13 +91,19 @@ if command -v zsh >/dev/null; then
     printf "${NOTE} Changing default shell to ${MAGENTA}zsh${RESET}..."
     printf "\n%.0s" {1..2}
 
-    # Loop to ensure the chsh command succeeds
-    while ! chsh -s "$(command -v zsh)"; do
+    # Retry chsh a few times (wrong password), then give up instead of looping forever
+    chsh_ok=0
+    for _ in 1 2 3; do
+      if chsh -s "$(command -v zsh)"; then chsh_ok=1; break; fi
       echo "${ERROR} Authentication failed. Please enter the correct password." 2>&1 | tee -a "$LOG"
       sleep 1
     done
 
-    printf "${INFO} Shell changed successfully to ${MAGENTA}zsh${RESET}" 2>&1 | tee -a "$LOG"
+    if [ "$chsh_ok" -eq 1 ]; then
+      printf "${INFO} Shell changed successfully to ${MAGENTA}zsh${RESET}" 2>&1 | tee -a "$LOG"
+    else
+      echo "${WARN} Could not change the shell. Run: chsh -s $(command -v zsh)" 2>&1 | tee -a "$LOG"
+    fi
   else
     echo "${NOTE} Your shell is already set to ${MAGENTA}zsh${RESET}."
   fi

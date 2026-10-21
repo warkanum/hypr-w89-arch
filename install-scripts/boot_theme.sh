@@ -51,9 +51,9 @@ done
 
 # Detect bootloader
 bootloader=""
-if [ -f "$grub_default" ] && [ -d /boot/grub ]; then
+if [ -f "$grub_default" ] && sudo test -d /boot/grub; then
   bootloader="grub"
-elif [ -d /boot/loader ] || [ -d /efi/loader ] || bootctl is-installed >/dev/null 2>&1; then
+elif sudo test -d /boot/loader || sudo test -d /efi/loader || sudo bootctl is-installed >/dev/null 2>&1; then
   bootloader="systemd-boot"
 fi
 echo "${INFO} Bootloader: ${SKY_BLUE}${bootloader:-unknown}${RESET}" | tee -a "$LOG"
@@ -117,14 +117,14 @@ case "$bootloader" in
       new="$(add_params "$(cat /etc/kernel/cmdline)")"
       echo "$new" | sudo tee /etc/kernel/cmdline >/dev/null
     fi
-    if [ -d /boot/loader/entries ]; then
+    # /boot is root-only on systemd-boot installs, so list and glob through sudo
+    if sudo test -d /boot/loader/entries; then
       mkdir -p "$bdir/entries"
-      sudo cp /boot/loader/entries/*.conf "$bdir/entries/" 2>/dev/null
-      for e in /boot/loader/entries/*.conf; do
-        [ -f "$e" ] || continue
-        grep -q '^options' "$e" || continue
-        grep -Eq '^options.*\bsplash\b' "$e" || sudo sed -i -E '/^options/ s/$/ quiet splash/' "$e"
-      done
+      while IFS= read -r e; do
+        sudo cp "$e" "$bdir/entries/"
+        sudo grep -q '^options' "$e" || continue
+        sudo grep -Eq '^options.*\bsplash\b' "$e" || sudo sed -i -E '/^options/ s/$/ quiet splash/' "$e"
+      done < <(sudo find /boot/loader/entries -name '*.conf')
     fi
     ;;
   *)
