@@ -37,10 +37,10 @@ install -m 755 "$src/hypr-theme" "$HOME/.local/bin/hypr-theme"
 echo "${OK} Installed colour schemes and hypr-theme." 2>&1 | tee -a "$LOG"
 
 # Remove the stock wallpapers shipped with Hyprland-Dots (names taken from the cloned dots)
-if [ -d Hyprland-Dots/wallpapers ]; then
+if [ -d vendor/Hyprland-Dots/wallpapers ]; then
   while IFS= read -r -d '' f; do
-    rm -f "$HOME/Pictures/wallpapers/${f#Hyprland-Dots/wallpapers/}"
-  done < <(find Hyprland-Dots/wallpapers -type f -print0)
+    rm -f "$HOME/Pictures/wallpapers/${f#vendor/Hyprland-Dots/wallpapers/}"
+  done < <(find vendor/Hyprland-Dots/wallpapers -type f -print0)
   find "$HOME/Pictures/wallpapers" -type d -empty -delete 2>/dev/null
   echo "${OK} Removed stock wallpapers." 2>&1 | tee -a "$LOG"
 fi

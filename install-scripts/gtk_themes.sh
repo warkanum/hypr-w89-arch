@@ -40,21 +40,15 @@ for PKG1 in "${engine[@]}"; do
     install_package "$PKG1" "$LOG"
 done
 
-# Check if the directory exists and delete it if present
-if [ -d "GTK-themes-icons" ]; then
-    echo "$NOTE GTK themes and Icons directory exist..deleting..." 2>&1 | tee -a "$LOG"
-    rm -rf "GTK-themes-icons" 2>&1 | tee -a "$LOG"
-fi
-
-echo "$NOTE Cloning ${SKY_BLUE}GTK themes and Icons${RESET} repository..." 2>&1 | tee -a "$LOG"
-if git clone --depth=1 https://github.com/LinuxBeginnings/GTK-themes-icons.git ; then
-    cd GTK-themes-icons
+echo "$NOTE Installing bundled ${SKY_BLUE}GTK themes and Icons${RESET} (vendor/GTK-themes-icons)..." 2>&1 | tee -a "$LOG"
+if [ -d vendor/GTK-themes-icons ]; then
+    cd vendor/GTK-themes-icons
     chmod +x auto-extract.sh
     ./auto-extract.sh
-    cd ..
+    cd ../..
     echo "$OK Extracted GTK Themes & Icons to ~/.icons & ~/.themes directories" 2>&1 | tee -a "$LOG"
 else
-    echo "$ERROR Download failed for GTK themes and Icons.." 2>&1 | tee -a "$LOG"
+    echo "$ERROR vendor/GTK-themes-icons not found. Run from the repo root." 2>&1 | tee -a "$LOG"
 fi
 
 printf "\n%.0s" {1..2}

@@ -53,7 +53,7 @@ Stargate / Star Trek themed Arch Linux Hyprland installer.
 | Option | What it does |
 |---|---|
 | `sddm_theme` | Bundled Qt6 Stargate login theme -> `/usr/share/sddm/themes/stargate` |
-| `dots` | Clones LinuxBeginnings/Hyprland-Dots, then applies the theme overlay |
+| `dots` | Installs the bundled `vendor/Hyprland-Dots`, then applies the theme overlay |
 | `star_lore` | [fastfetch-star-lore](https://github.com/warkanum/fastfetch-star-lore), Stargate + Star Trek only |
 | `kde` | Dolphin + KDE apps, Breeze, KDE portal; Qt themed with KDE (replaces Thunar/Fusion) |
 | `gtk_themes` | Minimal GTK: Flat-Remix + Bibata cursor, for GTK apps only (audited, neutral) |

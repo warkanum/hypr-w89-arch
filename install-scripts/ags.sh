@@ -74,10 +74,11 @@ if [ -d "ags_v1.9.0" ]; then
 fi
 
 printf "\n%.0s" {1..1}
-printf "${INFO} Kindly Standby...cloning and compiling ${SKY_BLUE}Aylur's GTK shell $ags_tag${RESET}...\n"
+printf "${INFO} Kindly Standby...compiling ${SKY_BLUE}Aylur's GTK shell $ags_tag${RESET}...\n"
 printf "\n%.0s" {1..1}
 # Clone repository with the specified tag and compile AGS
-if git clone --depth=1 https://github.com/LinuxBeginnings/ags_v1.9.0.git; then
+# Bundled copy (see vendor/SOURCES.txt); built in a throwaway working directory
+if cp -r vendor/ags_v1.9.0 ags_v1.9.0; then
     cd ags_v1.9.0 || exit 1
 
     # Patch tsconfig to avoid TS5107 failure (moduleResolution=node10 deprecation)
@@ -85,6 +86,10 @@ if git clone --depth=1 https://github.com/LinuxBeginnings/ags_v1.9.0.git; then
         # 1) Ensure ignoreDeprecations is present
         if ! grep -q '"ignoreDeprecations"[[:space:]]*:' tsconfig.json; then
             sed -i 's/"compilerOptions":[[:space:]]*{/"compilerOptions": {\n    "ignoreDeprecations": "6.0",/' tsconfig.json
+        fi
+        # TypeScript 6 no longer infers rootDir (TS5011) and stops auto-loading typeRoots (gi:// modules)
+        if ! grep -q '"rootDir"[[:space:]]*:' tsconfig.json; then
+            sed -i 's/"compilerOptions":[[:space:]]*{/"compilerOptions": {\n    "rootDir": ".\/src",\n    "types": ["*"],/' tsconfig.json
         fi
         # 2) Bump moduleResolution from node10 to node16 if present
         if grep -q '"moduleResolution"[[:space:]]*:[[:space:]]*"node10"' tsconfig.json; then
@@ -157,7 +162,7 @@ PAM_STUB
     mv "$MLOG" ../Install-Logs/ || true
     cd ..
 else
-    echo -e "\n${ERROR} Failed to download ${YELLOW}Aylur's GTK shell $ags_tag${RESET} Please check your connection\n" 2>&1 | tee -a "$LOG"
+    echo -e "\n${ERROR} Failed to copy ${YELLOW}Aylur's GTK shell $ags_tag${RESET} from vendor/ags_v1.9.0\n" 2>&1 | tee -a "$LOG"
     mv "$MLOG" ../Install-Logs/ || true
     exit 1
 fi

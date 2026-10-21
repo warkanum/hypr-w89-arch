@@ -1,0 +1,2710 @@
+#!/usr/bin/env bash
+# ==================================================
+#  KoolDots (2026)
+#  Project URL: https://github.com/LinuxBeginnings
+#  License: GNU GPLv3
+#  SPDX-License-Identifier: GPL-3.0-or-later
+# ==================================================
+# Opt-in helper for testing Hyprland's Lua config entrypoint.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SRC_HYPR_DIR="$REPO_DIR/config/hypr"
+DEST_HYPR_DIR="${XDG_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}}/hypr"
+BACKUP_DIR="${DEST_HYPR_DIR}-backup-lua-$(date +%Y%m%d-%H%M%S)"
+MIGRATION_TS="$(date +%Y%m%d-%H%M%S)"
+DRY_RUN=0
+YES=0
+REVERT=0
+
+USER_CONFIGS_DIR="$DEST_HYPR_DIR/UserConfigs"
+CONFIGS_DIR="$DEST_HYPR_DIR/configs"
+LEGACY_CONFIGS_DIR_NAME="LegacyConfigs"
+USER_WINDOW_RULES="$USER_CONFIGS_DIR/WindowRules.conf"
+USER_KEYBINDS="$USER_CONFIGS_DIR/UserKeybinds.conf"
+USER_ENV_VARS="$USER_CONFIGS_DIR/ENVariables.conf"
+USER_STARTUP_APPS="$USER_CONFIGS_DIR/Startup_Apps.conf"
+USER_SETTINGS="$USER_CONFIGS_DIR/UserSettings.conf"
+USER_DECORATIONS="$USER_CONFIGS_DIR/UserDecorations.conf"
+USER_ANIMATIONS="$USER_CONFIGS_DIR/UserAnimations.conf"
+USER_LAPTOPS="$USER_CONFIGS_DIR/Laptops.conf"
+USER_LAYER_RULES="$USER_CONFIGS_DIR/LayerRules.conf"
+SYSTEM_WINDOW_RULES="$CONFIGS_DIR/WindowRules.conf"
+SYSTEM_LAYER_RULES="$CONFIGS_DIR/LayerRules.conf"
+SYSTEM_KEYBINDS="$CONFIGS_DIR/Keybinds.conf"
+SYSTEM_ENV_VARS="$CONFIGS_DIR/ENVariables.conf"
+SYSTEM_STARTUP_APPS="$CONFIGS_DIR/Startup_Apps.conf"
+SYSTEM_SETTINGS="$CONFIGS_DIR/SystemSettings.conf"
+SYSTEM_LAPTOPS="$CONFIGS_DIR/Laptops.conf"
+USER_CONFIGS_LEGACY_ROOT="$USER_CONFIGS_DIR/$LEGACY_CONFIGS_DIR_NAME"
+CONFIGS_LEGACY_ROOT="$CONFIGS_DIR/$LEGACY_CONFIGS_DIR_NAME"
+USER_CONFIGS_LEGACY_DIR="$USER_CONFIGS_LEGACY_ROOT/$MIGRATION_TS"
+CONFIGS_LEGACY_DIR="$CONFIGS_LEGACY_ROOT/$MIGRATION_TS"
+USER_OVERRIDES_SHIM="$DEST_HYPR_DIR/lua/user_overrides.lua"
+DEST_MONITORS_CONF="$DEST_HYPR_DIR/monitors.conf"
+DEST_LUA_MONITORS="$USER_CONFIGS_DIR/monitors.lua"
+DEST_WORKSPACES_CONF="$DEST_HYPR_DIR/workspaces.conf"
+DEST_LUA_WORKSPACES="$USER_CONFIGS_DIR/workspaces.lua"
+SOURCE_LUA_ENTRY_ENABLED="$SRC_HYPR_DIR/hyprland.lua"
+SOURCE_LUA_ENTRY_DISABLED="$SRC_HYPR_DIR/hyprland.lua.disable"
+SRC_USER_LUA_TEMPLATES_DIR="$SRC_HYPR_DIR/UserConfigs"
+SRC_MONITORS_CONF="$SRC_HYPR_DIR/monitors.conf"
+SRC_WORKSPACES_CONF="$SRC_HYPR_DIR/workspaces.conf"
+SRC_USER_LUA_MONITORS="$SRC_USER_LUA_TEMPLATES_DIR/monitors.lua"
+SRC_USER_LUA_WORKSPACES="$SRC_USER_LUA_TEMPLATES_DIR/workspaces.lua"
+DEST_LUA_ENTRY="$DEST_HYPR_DIR/hyprland.lua"
+DEST_LUA_ENTRY_DISABLED="$DEST_HYPR_DIR/hyprland.lua.disable"
+SOURCE_LUA_ENTRY=""
+USER_CONFIGS_PRESERVED_CONFS=(
+  "kitty.conf"
+  "ghostty.conf"
+  "hyprview-layout.conf"
+)
+
+usage() {
+  cat <<USAGE
+Usage: $(basename "$0") [--yes] [--dry-run] [--revert]
+
+Copies the repo's Hyprland Lua entrypoint into:
+  $DEST_HYPR_DIR
+
+This migrates Hyprlang configuration to Lua and archives legacy .conf files
+into LegacyConfigs/<timestamp> while creating a full backup of the
+current Hyprland config directory before changing files.
+
+Options:
+  -y, --yes      Run without confirmation prompts.
+  -n, --dry-run  Show what would change without copying files.
+  -r, --revert   Revert migration by restoring latest LegacyConfigs/<timestamp> .conf files.
+  -h, --help     Show this help.
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -y|--yes)
+      YES=1
+      ;;
+    -n|--dry-run)
+      DRY_RUN=1
+      ;;
+    -r|--revert)
+      REVERT=1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "[ERROR] Unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+if [ -f "$SOURCE_LUA_ENTRY_ENABLED" ]; then
+  SOURCE_LUA_ENTRY="$SOURCE_LUA_ENTRY_ENABLED"
+elif [ -f "$SOURCE_LUA_ENTRY_DISABLED" ]; then
+  SOURCE_LUA_ENTRY="$SOURCE_LUA_ENTRY_DISABLED"
+fi
+
+if [ "$REVERT" -eq 0 ] && [ ! -d "$SRC_HYPR_DIR/lua" ]; then
+  echo "[ERROR] Lua config source files were not found under $SRC_HYPR_DIR" >&2
+  exit 1
+fi
+
+if [ "$REVERT" -eq 0 ] && [ -z "$SOURCE_LUA_ENTRY" ] && [ ! -f "$DEST_LUA_ENTRY" ] && [ ! -f "$DEST_LUA_ENTRY_DISABLED" ]; then
+  echo "[ERROR] No Lua entrypoint was found at $SRC_HYPR_DIR/hyprland.lua(.disable) or $DEST_HYPR_DIR/hyprland.lua(.disable)" >&2
+  exit 1
+fi
+
+if command -v Hyprland >/dev/null 2>&1; then
+  HYPR_VERSION="$(Hyprland --version 2>/dev/null | sed -n '1p' || true)"
+  echo "[INFO] Detected $HYPR_VERSION"
+else
+  echo "[WARN] Hyprland binary was not found in PATH; continuing because this may be an offline config migration."
+fi
+
+echo "[INFO] Source: $SRC_HYPR_DIR"
+echo "[INFO] Target: $DEST_HYPR_DIR"
+echo "[INFO] Backup: $BACKUP_DIR"
+if [ "$REVERT" -eq 1 ]; then
+  echo "[WARN] Revert mode: restores latest LegacyConfigs/<timestamp> .conf files in UserConfigs, configs, and hypr root."
+else
+  echo "[WARN] This enables Hyprland's Lua entrypoint (project is Lua-only)."
+  echo "[WARN] Legacy .conf files (including hyprland.conf, monitors.conf, workspaces.conf) move into LegacyConfigs/<timestamp>."
+  echo "[INFO] hypridle.conf, hyprlock*.conf, and application-style.conf stay as native .conf files because they do not use Hyprland's Lua API."
+fi
+
+restore_latest_conf_backup() {
+  local target_dir="$1"
+  local label="$2"
+  local latest_archive=""
+  local legacy_root="$target_dir/$LEGACY_CONFIGS_DIR_NAME"
+  local moved=0
+  local file
+  local basename
+  local keep
+  local archives=()
+
+  [ -d "$target_dir" ] || return 0
+
+  if [ -d "$legacy_root" ]; then
+    mapfile -t archives < <(find "$legacy_root" -mindepth 1 -maxdepth 1 -type d | sort)
+  fi
+
+  if [ "${#archives[@]}" -eq 0 ]; then
+    mapfile -t archives < <(find "$target_dir" -mindepth 1 -maxdepth 1 -type d -name 'backup-*' | sort)
+  fi
+
+  [ "${#archives[@]}" -gt 0 ] || return 0
+  latest_archive="${archives[${#archives[@]}-1]}"
+
+  while IFS= read -r -d '' file; do
+    cp -a "$file" "$target_dir/"
+    moved=1
+  done < <(find "$latest_archive" -maxdepth 1 -type f -name '*.conf' -print0)
+
+  if [ "$moved" -eq 1 ]; then
+    echo "[OK] Restored $label/*.conf from $latest_archive"
+  else
+    echo "[INFO] No .conf files found in latest archive for $label: $latest_archive"
+  fi
+}
+
+has_active_hyprlang_content() {
+  local source_conf="$1"
+  [ -f "$source_conf" ] || return 1
+  grep -Eq '^[[:space:]]*[^#[:space:]]' "$source_conf"
+}
+
+lua_file_is_generated() {
+  local lua_path="$1"
+  [ -f "$lua_path" ] || return 1
+  grep -Eq 'auto-generated|Converted from|No active entries were found|Source reference from' "$lua_path"
+}
+
+ensure_template_for_empty_user_conf() {
+  local source_conf="$1"
+  local target_lua="$2"
+  local template_lua="$3"
+
+  [ -f "$template_lua" ] || return 0
+
+  if has_active_hyprlang_content "$source_conf"; then
+    return 0
+  fi
+
+  if [ -f "$target_lua" ]; then
+    echo "[INFO] Preserving existing Lua file for empty/default source: $target_lua"
+    return 0
+  fi
+
+  cp -f "$template_lua" "$target_lua"
+  echo "[OK] Ensured template for empty/default source: $source_conf -> $target_lua"
+}
+
+ensure_templates_for_empty_user_configs() {
+  ensure_template_for_empty_user_conf "$USER_ENV_VARS" "$USER_CONFIGS_DIR/user_env.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_env.lua"
+  ensure_template_for_empty_user_conf "$USER_STARTUP_APPS" "$USER_CONFIGS_DIR/user_startup.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_startup.lua"
+  ensure_template_for_empty_user_conf "$USER_WINDOW_RULES" "$USER_CONFIGS_DIR/user_window_rules.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_window_rules.lua"
+  ensure_template_for_empty_user_conf "$USER_LAYER_RULES" "$USER_CONFIGS_DIR/user_layer_rules.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_layer_rules.lua"
+  ensure_template_for_empty_user_conf "$USER_KEYBINDS" "$USER_CONFIGS_DIR/user_keybinds.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_keybinds.lua"
+  ensure_template_for_empty_user_conf "$USER_SETTINGS" "$USER_CONFIGS_DIR/user_settings.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_settings.lua"
+  ensure_template_for_empty_user_conf "$USER_DECORATIONS" "$USER_CONFIGS_DIR/user_decorations.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_decorations.lua"
+  ensure_template_for_empty_user_conf "$USER_ANIMATIONS" "$USER_CONFIGS_DIR/user_animations.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_animations.lua"
+  ensure_template_for_empty_user_conf "$USER_LAPTOPS" "$USER_CONFIGS_DIR/user_laptops.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_laptops.lua"
+  ensure_template_for_empty_user_conf "$USER_CONFIGS_DIR/01-UserDefaults.conf" "$USER_CONFIGS_DIR/user_defaults.lua" "$SRC_USER_LUA_TEMPLATES_DIR/user_defaults.lua"
+  ensure_template_for_empty_user_conf "$DEST_MONITORS_CONF" "$DEST_LUA_MONITORS" "$SRC_USER_LUA_MONITORS"
+  ensure_template_for_empty_user_conf "$DEST_WORKSPACES_CONF" "$DEST_LUA_WORKSPACES" "$SRC_USER_LUA_WORKSPACES"
+}
+
+if [ "$YES" -eq 0 ]; then
+  if [ "$REVERT" -eq 1 ]; then
+    printf "[ACTION] Continue and revert Lua migration using latest legacy archives? [y/N] "
+  else
+    printf "[ACTION] Continue with Lua config migration? [y/N] "
+  fi
+  read -r reply
+  case "$reply" in
+    [Yy]|[Yy][Ee][Ss])
+      ;;
+    *)
+      echo "[INFO] Cancelled. No changes made."
+      exit 0
+      ;;
+  esac
+fi
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  if [ "$REVERT" -eq 1 ]; then
+    if [ -f "$DEST_LUA_ENTRY" ]; then
+      echo "[DRY-RUN] Would disable Lua entrypoint: $DEST_LUA_ENTRY -> $DEST_LUA_ENTRY_DISABLED"
+    elif [ -f "$DEST_LUA_ENTRY_DISABLED" ]; then
+      echo "[DRY-RUN] Lua entrypoint already disabled: $DEST_LUA_ENTRY_DISABLED"
+    else
+      echo "[DRY-RUN] No Lua entrypoint found to disable at: $DEST_LUA_ENTRY"
+    fi
+    echo "[DRY-RUN] Would restore latest LegacyConfigs/<timestamp> .conf files into:"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR"
+    echo "[DRY-RUN]   - $CONFIGS_DIR"
+  else
+    echo "[DRY-RUN] Would create target directory if missing: $DEST_HYPR_DIR"
+    if [ -d "$DEST_HYPR_DIR" ]; then
+      echo "[DRY-RUN] Would copy backup: $DEST_HYPR_DIR -> $BACKUP_DIR"
+    fi
+    if [ -f "$DEST_LUA_ENTRY_DISABLED" ]; then
+      echo "[DRY-RUN] Would enable Lua entrypoint: $DEST_LUA_ENTRY_DISABLED -> $DEST_LUA_ENTRY"
+    fi
+    if [ -n "$SOURCE_LUA_ENTRY" ]; then
+      if [ -f "$DEST_LUA_ENTRY" ]; then
+        echo "[DRY-RUN] Would refresh Lua entrypoint from template: $SOURCE_LUA_ENTRY -> $DEST_LUA_ENTRY"
+      else
+        echo "[DRY-RUN] Would install Lua entrypoint: $SOURCE_LUA_ENTRY -> $DEST_LUA_ENTRY"
+      fi
+    elif [ -f "$DEST_LUA_ENTRY" ]; then
+      echo "[DRY-RUN] Lua entrypoint already enabled: $DEST_LUA_ENTRY (no source template available to refresh)"
+    fi
+    echo "[DRY-RUN] Would replace Lua module directory: $DEST_HYPR_DIR/lua"
+    echo "[DRY-RUN] Would generate split configs/UserConfigs Lua overlays:"
+    echo "[DRY-RUN]   - $CONFIGS_DIR/system_env.lua"
+    echo "[DRY-RUN]   - $CONFIGS_DIR/system_startup.lua"
+    echo "[DRY-RUN]   - $CONFIGS_DIR/system_window_rules.lua"
+    echo "[DRY-RUN]   - $CONFIGS_DIR/system_layer_rules.lua"
+    echo "[DRY-RUN]   - $CONFIGS_DIR/system_keybinds.lua"
+    echo "[DRY-RUN]   - $CONFIGS_DIR/system_settings.lua"
+    echo "[DRY-RUN]   - $CONFIGS_DIR/system_laptops.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_env.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_startup.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_window_rules.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_layer_rules.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_keybinds.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_settings.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_decorations.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_animations.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_laptops.lua"
+    echo "[DRY-RUN]   - $USER_CONFIGS_DIR/user_defaults.lua"
+    echo "[DRY-RUN] Would ensure repo Lua templates for empty/default UserConfigs/*.conf files."
+    echo "[DRY-RUN]   - $DEST_LUA_MONITORS (generated from $DEST_MONITORS_CONF)"
+    echo "[DRY-RUN]   - $DEST_LUA_WORKSPACES (generated from $DEST_WORKSPACES_CONF)"
+    if [ -d "$USER_CONFIGS_DIR" ]; then
+      echo "[DRY-RUN] Would move UserConfigs/*.conf into: $USER_CONFIGS_LEGACY_DIR"
+    fi
+    if [ -d "$CONFIGS_DIR" ]; then
+      echo "[DRY-RUN] Would move configs/*.conf into: $CONFIGS_LEGACY_DIR"
+    fi
+    echo "[DRY-RUN] Would move legacy root *.conf (hyprland.conf, monitors.conf, workspaces.conf) into: $DEST_HYPR_DIR/$LEGACY_CONFIGS_DIR_NAME/$MIGRATION_TS"
+  fi
+  exit 0
+fi
+if [ "$REVERT" -eq 1 ]; then
+  if [ -f "$DEST_LUA_ENTRY" ]; then
+    mv -f "$DEST_LUA_ENTRY" "$DEST_LUA_ENTRY_DISABLED"
+    echo "[OK] Disabled Lua entrypoint: $DEST_LUA_ENTRY_DISABLED"
+  elif [ -f "$DEST_LUA_ENTRY_DISABLED" ]; then
+    echo "[INFO] Lua entrypoint already disabled: $DEST_LUA_ENTRY_DISABLED"
+  else
+    echo "[INFO] No Lua entrypoint found to disable at $DEST_LUA_ENTRY"
+  fi
+  if [ -f "$DEST_HYPR_DIR/hypridle.conf" ]; then
+    sed -i "s|hyprctl dispatch hl.dsp.dpms '{ action = \"off\" }'|hyprctl dispatch dpms off|g" "$DEST_HYPR_DIR/hypridle.conf"
+    sed -i "s|hyprctl dispatch hl.dsp.dpms '{ action = \"on\" }'|hyprctl dispatch dpms on|g" "$DEST_HYPR_DIR/hypridle.conf"
+  fi
+  restore_latest_conf_backup "$USER_CONFIGS_DIR" "$USER_CONFIGS_DIR"
+  restore_latest_conf_backup "$CONFIGS_DIR" "$CONFIGS_DIR"
+  restore_latest_conf_backup "$DEST_HYPR_DIR" "$DEST_HYPR_DIR"
+  echo "[OK] Revert complete."
+  echo "[INFO] Restart Hyprland to load restored .conf files."
+  exit 0
+fi
+
+mkdir -p "$DEST_HYPR_DIR"
+
+if [ -d "$DEST_HYPR_DIR" ] && [ -n "$(find "$DEST_HYPR_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+  cp -a "$DEST_HYPR_DIR" "$BACKUP_DIR"
+  echo "[OK] Backup created at $BACKUP_DIR"
+fi
+if [ -f "$DEST_LUA_ENTRY_DISABLED" ]; then
+  if [ -f "$DEST_LUA_ENTRY" ]; then
+    rm -f "$DEST_LUA_ENTRY_DISABLED"
+    echo "[INFO] Removed duplicate disabled entrypoint: $DEST_LUA_ENTRY_DISABLED"
+  else
+    mv "$DEST_LUA_ENTRY_DISABLED" "$DEST_LUA_ENTRY"
+    echo "[OK] Enabled Lua entrypoint: $DEST_LUA_ENTRY"
+  fi
+fi
+if [ -n "$SOURCE_LUA_ENTRY" ]; then
+  cp -f "$SOURCE_LUA_ENTRY" "$DEST_LUA_ENTRY"
+  echo "[OK] Installed/updated Lua entrypoint: $SOURCE_LUA_ENTRY -> $DEST_LUA_ENTRY"
+elif [ -f "$DEST_LUA_ENTRY" ]; then
+  echo "[INFO] Lua entrypoint already enabled: $DEST_LUA_ENTRY (source template unavailable; keeping existing entrypoint)"
+else
+  echo "[ERROR] Unable to locate a Lua entrypoint to enable." >&2
+  exit 1
+fi
+rm -rf "$DEST_HYPR_DIR/lua"
+cp -a "$SRC_HYPR_DIR/lua" "$DEST_HYPR_DIR/lua"
+mkdir -p "$USER_CONFIGS_DIR" "$CONFIGS_DIR"
+if [ -d "$SRC_HYPR_DIR/configs" ]; then
+  for src_lua in "$SRC_HYPR_DIR/configs/"*.lua; do
+    [ -f "$src_lua" ] || continue
+    cp -f "$src_lua" "$CONFIGS_DIR/"
+  done
+fi
+python3 - \
+  "$CONFIGS_DIR" \
+  "$USER_CONFIGS_DIR" \
+  "$SYSTEM_WINDOW_RULES" \
+  "$SYSTEM_LAYER_RULES" \
+  "$SYSTEM_KEYBINDS" \
+  "$SYSTEM_ENV_VARS" \
+  "$SYSTEM_STARTUP_APPS" \
+  "$SYSTEM_SETTINGS" \
+  "$SYSTEM_LAPTOPS" \
+  "$USER_WINDOW_RULES" \
+  "$USER_LAYER_RULES" \
+  "$USER_KEYBINDS" \
+  "$USER_ENV_VARS" \
+  "$USER_STARTUP_APPS" \
+  "$USER_SETTINGS" \
+  "$USER_DECORATIONS" \
+  "$USER_ANIMATIONS" \
+  "$USER_LAPTOPS" \
+  "$USER_CONFIGS_DIR/01-UserDefaults.conf" \
+  "$DEST_MONITORS_CONF" \
+  "$DEST_LUA_MONITORS" \
+  "$DEST_WORKSPACES_CONF" \
+  "$DEST_LUA_WORKSPACES" \
+  "$SRC_MONITORS_CONF" \
+  "$SRC_WORKSPACES_CONF" \
+  "$SRC_USER_LUA_MONITORS" \
+  "$SRC_USER_LUA_WORKSPACES" \
+  "$SRC_HYPR_DIR/configs" <<'PY'
+import os
+import re
+import sys
+from pathlib import Path
+HEADER = """-- ==================================================
+--  KoolDots (2026)
+--  Project URL: https://github.com/LinuxBeginnings
+--  License: GNU GPLv3
+--  SPDX-License-Identifier: GPL-3.0-or-later
+-- ==================================================
+"""
+system_configs_dir = Path(sys.argv[1])
+user_configs_dir = Path(sys.argv[2])
+system_window_rules_path = Path(sys.argv[3])
+system_layer_rules_path = Path(sys.argv[4])
+system_keybinds_path = Path(sys.argv[5])
+system_env_path = Path(sys.argv[6])
+system_startup_path = Path(sys.argv[7])
+system_settings_path = Path(sys.argv[8])
+system_laptops_path = Path(sys.argv[9])
+window_rules_path = Path(sys.argv[10])
+layer_rules_path = Path(sys.argv[11])
+keybinds_path = Path(sys.argv[12])
+env_path = Path(sys.argv[13])
+startup_path = Path(sys.argv[14])
+settings_path = Path(sys.argv[15])
+decorations_path = Path(sys.argv[16])
+animations_path = Path(sys.argv[17])
+laptops_path = Path(sys.argv[18])
+user_defaults_path = Path(sys.argv[19])
+monitors_conf_path = Path(sys.argv[20])
+monitors_lua_path = Path(sys.argv[21])
+workspaces_conf_path = Path(sys.argv[22])
+workspaces_lua_path = Path(sys.argv[23])
+src_monitors_conf_path = Path(sys.argv[24]) if len(sys.argv) > 24 else None
+src_workspaces_conf_path = Path(sys.argv[25]) if len(sys.argv) > 25 else None
+src_user_lua_monitors_path = Path(sys.argv[26]) if len(sys.argv) > 26 else None
+src_user_lua_workspaces_path = Path(sys.argv[27]) if len(sys.argv) > 27 else None
+src_configs_dir = Path(sys.argv[28]) if len(sys.argv) > 28 else None
+
+files_out = {
+    "system_env": system_configs_dir / "system_env.lua",
+    "system_startup": system_configs_dir / "system_startup.lua",
+    "system_window_rules": system_configs_dir / "system_window_rules.lua",
+    "system_layer_rules": system_configs_dir / "system_layer_rules.lua",
+    "system_keybinds": system_configs_dir / "system_keybinds.lua",
+    "system_settings": system_configs_dir / "system_settings.lua",
+    "system_laptops": system_configs_dir / "system_laptops.lua",
+    "env": user_configs_dir / "user_env.lua",
+    "startup": user_configs_dir / "user_startup.lua",
+    "window_rules": user_configs_dir / "user_window_rules.lua",
+    "layer_rules": user_configs_dir / "user_layer_rules.lua",
+    "keybinds": user_configs_dir / "user_keybinds.lua",
+    "settings": user_configs_dir / "user_settings.lua",
+    "decorations": user_configs_dir / "user_decorations.lua",
+    "animations": user_configs_dir / "user_animations.lua",
+    "laptops": user_configs_dir / "user_laptops.lua",
+    "user_defaults": user_configs_dir / "user_defaults.lua",
+    "monitors": monitors_lua_path,
+    "workspaces": workspaces_lua_path,
+}
+
+def strip_comment(line):
+    return line.split("#", 1)[0].strip()
+
+def has_active_hyprlang_content_py(path):
+    if path is None or not path.exists():
+        return False
+    try:
+        for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = strip_comment(raw)
+            if line:
+                return True
+    except Exception:
+        return False
+    return False
+
+def split_items(value):
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+def lua_string(value):
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+def write_file(path, lines):
+    content = "\n".join(lines).rstrip() + "\n"
+    if not content.startswith(HEADER):
+        content = HEADER + "\n" + content.lstrip("\n")
+    path.write_text(content, encoding="utf-8")
+    print(f"[OK] Wrote {path}")
+
+def source_examples(path):
+    if not path.exists():
+        return []
+    lines = []
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        lines.append(f"-- {stripped}")
+    return lines
+def latest_legacy_file(path):
+    legacy_root = path.parent / "LegacyConfigs"
+    if not legacy_root.is_dir():
+        return None
+    candidates = []
+    for snapshot in sorted(legacy_root.iterdir()):
+        if not snapshot.is_dir():
+            continue
+        candidate = snapshot / path.name
+        if candidate.is_file():
+            candidates.append(candidate)
+    return candidates[-1] if candidates else None
+
+def parse_env(path, allow_legacy=True):
+    entries = []
+    source_path = path if path.exists() else (latest_legacy_file(path) if allow_legacy else None)
+    if source_path is None:
+        return entries
+    if source_path != path:
+        print(f"[INFO] {path.name} not found at {path}; using legacy source {source_path}")
+    for raw in source_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = strip_comment(raw)
+        if not line:
+            continue
+        comma_match = re.match(r"^env\s*=\s*([^,]+)\s*,\s*(.+)$", line)
+        if comma_match:
+            entries.append((comma_match.group(1).strip(), comma_match.group(2).strip()))
+            continue
+        equals_match = re.match(r"^env\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", line)
+        if equals_match:
+            entries.append((equals_match.group(1).strip(), equals_match.group(2).strip()))
+    return entries
+
+def parse_startup(path, *, variables=None, visited=None):
+    entries = []
+    if not path.exists():
+        return entries
+
+    if variables is None:
+        variables = {}
+    if visited is None:
+        visited = set()
+
+    try:
+        resolved = path.resolve()
+    except FileNotFoundError:
+        resolved = path
+
+    if resolved in visited:
+        return []
+    visited.add(resolved)
+
+    def expand(value):
+        for _ in range(8):
+            new_value = value
+            for name, var_value in variables.items():
+                new_value = new_value.replace(f"${name}", var_value)
+            if new_value == value:
+                break
+            value = new_value
+        return os.path.expandvars(value)
+
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = strip_comment(raw)
+        if not line:
+            continue
+
+        source_match = re.match(r"^source\s*=\s*(.+)$", line)
+        if source_match:
+            source_value = expand(source_match.group(1).strip())
+            source_path = Path(source_value).expanduser()
+            entries.extend(parse_startup(source_path, variables=variables, visited=visited))
+            continue
+
+        variable = re.match(r"^\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", line)
+        if variable:
+            variables[variable.group(1)] = expand(variable.group(2).strip())
+            continue
+
+        match = re.match(r"^exec(?:-once)?\s*=\s*(.+)$", line)
+        if match:
+            entries.append(expand(match.group(1).strip()))
+
+    return entries
+
+MONITOR_DIRECTIVE_KEYS = {
+    "disable",
+    "disabled",
+    "mirror",
+    "bitdepth",
+    "transform",
+    "cm",
+    "icc",
+    "vrr",
+    "addreserved",
+    "reserved",
+    "supports_hdr",
+    "supports_wide_color",
+    "supportshdr",
+    "supportswidecolor",
+    "max_luminance",
+    "max_avg_luminance",
+    "min_luminance",
+    "maxluminance",
+    "maxavgluminance",
+    "minluminance",
+    "sdr_max_luminance",
+    "sdr_min_luminance",
+    "sdr_eotf",
+    "sdrmaxluminance",
+    "sdrminluminance",
+    "sdreotf",
+    "sdrbrightness",
+    "sdrsaturation",
+}
+
+MONITOR_FIELD_MAP = {
+    "disable": "disabled",
+    "addreserved": "reserved",
+    "supportswidecolor": "supports_wide_color",
+    "supportshdr": "supports_hdr",
+    "maxluminance": "max_luminance",
+    "maxavgluminance": "max_avg_luminance",
+    "minluminance": "min_luminance",
+    "sdrmaxluminance": "sdr_max_luminance",
+    "sdrminluminance": "sdr_min_luminance",
+    "sdreotf": "sdr_eotf",
+}
+
+def parse_monitors(path):
+    entries = []
+    if not path.exists():
+        return entries
+
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = strip_comment(raw)
+        if not line:
+            continue
+        match = re.match(r"^monitor\s*=\s*(.+)$", line)
+        if not match:
+            continue
+
+        parts = [part.strip() for part in match.group(1).split(",")]
+        if len(parts) < 2:
+            continue
+
+        spec = {"output": parts[0]}
+        mode_or_directive = parts[1].lower().replace("-", "_")
+        extras = []
+
+        if mode_or_directive in {"disable", "disabled"}:
+            spec["mode"] = "disable"
+            entries.append(spec)
+            continue
+
+        if len(parts) >= 4 and mode_or_directive not in MONITOR_DIRECTIVE_KEYS:
+            spec["mode"] = parts[1]
+            if parts[2]:
+                spec["position"] = parts[2]
+            if parts[3]:
+                spec["scale"] = parts[3]
+            extras = parts[4:]
+        else:
+            extras = parts[1:]
+
+        i = 0
+        while i < len(extras):
+            key = extras[i].strip().lower().replace("-", "_")
+            if not key:
+                i += 1
+                continue
+            field = MONITOR_FIELD_MAP.get(key, key)
+
+            if field == "reserved" and i + 4 < len(extras):
+                spec["reserved"] = [
+                    extras[i + 1].strip(),
+                    extras[i + 2].strip(),
+                    extras[i + 3].strip(),
+                    extras[i + 4].strip(),
+                ]
+                i += 5
+                continue
+            if field == "disabled":
+                if i + 1 >= len(extras):
+                    spec["disabled"] = "true"
+                    i += 1
+                    continue
+                value = extras[i + 1].strip()
+                spec["disabled"] = value if value else "true"
+                i += 2
+                continue
+
+            if i + 1 >= len(extras):
+                i += 1
+                continue
+
+            value = extras[i + 1].strip()
+            if value:
+                spec[field] = value
+            i += 2
+
+        entries.append(spec)
+
+    return entries
+def parse_bool_word(value):
+    lowered = value.strip().lower()
+    if lowered in {"on", "true", "yes"}:
+        return True
+    if lowered in {"off", "false", "no"}:
+        return False
+    return None
+
+WORKSPACE_FIELD_MAP = {
+    "gapsin": "gaps_in",
+    "gapsout": "gaps_out",
+    "bordersize": "border_size",
+    "on_created_empty": "on_created_empty",
+    "layoutopt": "layout_opts",
+    "layoutopts": "layout_opts",
+}
+
+WORKSPACE_INVERTED_BOOL_FIELDS = {
+    "border": "no_border",
+    "rounding": "no_rounding",
+    "shadow": "no_shadow",
+}
+
+def parse_workspaces(path):
+    entries = []
+    if not path.exists():
+        return entries
+
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = strip_comment(raw)
+        if not line:
+            continue
+        match = re.match(r"^workspace\s*=\s*(.+)$", line)
+        if not match:
+            continue
+
+        parts = [part.strip() for part in match.group(1).split(",")]
+        if not parts or not parts[0]:
+            continue
+
+        rule = {"workspace": parts[0]}
+        for part in parts[1:]:
+            if ":" not in part:
+                continue
+            key, value = part.split(":", 1)
+            key = key.strip().lower().replace("-", "_")
+            value = value.strip()
+            if not key or value == "":
+                continue
+
+            if key in WORKSPACE_INVERTED_BOOL_FIELDS:
+                bool_value = parse_bool_word(value)
+                if bool_value is None:
+                    continue
+                rule[WORKSPACE_INVERTED_BOOL_FIELDS[key]] = not bool_value
+                continue
+
+            normalized = WORKSPACE_FIELD_MAP.get(key, key)
+            bool_value = parse_bool_word(value)
+            if bool_value is not None:
+                rule[normalized] = bool_value
+            else:
+                rule[normalized] = value
+
+        entries.append(rule)
+
+    return entries
+
+def emit_monitor(spec):
+    lines = [
+        "hl.monitor({",
+        f"    output = {lua_string(spec.get('output', ''))},",
+    ]
+
+    mode_value = str(spec.get("mode", "")).strip().lower()
+    disabled_value = str(spec.get("disabled", "")).strip().lower()
+    disabled_truthy = {"1", "true", "yes", "on", "disable", "disabled"}
+    if mode_value in {"disable", "disabled"} or disabled_value in disabled_truthy:
+        lines.append("    mode = \"preferred\",")
+        lines.append("    disabled = true,")
+        lines.append("})")
+        return "\n".join(lines)
+
+    if "mode" in spec:
+        lines.append(f"    mode = {lua_string(spec['mode'])},")
+    if "position" in spec:
+        lines.append(f"    position = {lua_string(spec['position'])},")
+    if "scale" in spec:
+        lines.append(f"    scale = {lua_string(spec['scale'])},")
+    if "mirror" in spec:
+        lines.append(f"    mirror = {lua_string(spec['mirror'])},")
+
+    for key in [
+        "bitdepth",
+        "transform",
+        "vrr",
+        "supports_hdr",
+        "supports_wide_color",
+        "max_luminance",
+        "max_avg_luminance",
+        "min_luminance",
+        "sdr_max_luminance",
+        "sdr_min_luminance",
+        "sdrbrightness",
+        "sdrsaturation",
+    ]:
+        if key in spec:
+            lines.append(f"    {key} = {scalar(spec[key])},")
+
+    for key in ["cm", "icc", "sdr_eotf"]:
+        if key in spec:
+            lines.append(f"    {key} = {lua_string(spec[key])},")
+
+    if "reserved" in spec and len(spec["reserved"]) == 4:
+        top, right, bottom, left = spec["reserved"]
+        lines.extend([
+            "    reserved = {",
+            f"        top = {scalar(top)},",
+            f"        right = {scalar(right)},",
+            f"        bottom = {scalar(bottom)},",
+            f"        left = {scalar(left)},",
+            "    },",
+        ])
+
+    lines.append("})")
+    return "\n".join(lines)
+
+def emit_workspace_rule(spec):
+    lines = [
+        "hl.workspace_rule({",
+        f"    workspace = {lua_string(spec['workspace'])},",
+    ]
+    for key, value in spec.items():
+        if key == "workspace":
+            continue
+        if isinstance(value, bool):
+            rendered = "true" if value else "false"
+        else:
+            text = str(value).strip()
+            if re.fullmatch(r"[-+]?\d+(\.\d+)?", text):
+                rendered = text
+            else:
+                rendered = lua_string(text)
+        lines.append(f"    {key} = {rendered},")
+    lines.append("})")
+    return "\n".join(lines)
+def unquote(value):
+    value = value.strip()
+    if len(value) >= 2 and (
+        (value[0] == "\"" and value[-1] == "\"")
+        or (value[0] == "'" and value[-1] == "'")
+    ):
+        return value[1:-1]
+    return value
+
+def resolve_shell_default(value):
+    value = value.strip()
+    match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\:-([^}]*)\}", value)
+    if match:
+        env_value = os.getenv(match.group(1), "")
+        return env_value if env_value else match.group(2)
+    match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z0-9_]*)-([^}]*)\}", value)
+    if match:
+        env_value = os.getenv(match.group(1))
+        return env_value if env_value is not None else match.group(2)
+    match = re.fullmatch(r"\$([A-Za-z_][A-Za-z0-9_]*)", value)
+    if match:
+        return os.getenv(match.group(1), "")
+    return value
+
+def parse_user_defaults(path):
+    defaults = {}
+    if not path.exists():
+        return defaults
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = strip_comment(raw)
+        if not line:
+            continue
+        match = re.match(r"^\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", line)
+        if not match:
+            continue
+        key = match.group(1)
+        value = unquote(resolve_shell_default(match.group(2)))
+        defaults[key] = value
+    return defaults
+
+def parse_hyprlang_sections(path):
+    sections = {}
+    if path is None or not path.exists():
+        return sections
+
+    stack = [sections]
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = strip_comment(raw)
+        if not line:
+            continue
+        if line.startswith("source"):
+            continue
+        if line.endswith("{"):
+            name = line[:-1].strip().replace("-", "_")
+            if not name or name.startswith("$"):
+                continue
+            current = stack[-1]
+            target = current.setdefault(name, {})
+            stack.append(target)
+            continue
+        if line == "}":
+            if len(stack) > 1:
+                stack.pop()
+            continue
+        if "=" in line:
+            key, value = [part.strip() for part in line.split("=", 1)]
+            if not key or key.startswith("$"):
+                continue
+            key = key.replace("-", "_")
+            container = stack[-1]
+            parts = [part.replace("-", "_") for part in key.split(".") if part]
+            for part in parts[:-1]:
+                container = container.setdefault(part, {})
+            container[parts[-1]] = value
+    return sections
+
+def parse_scripts_dir(path):
+    if path is None or not path.exists():
+        return None
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = strip_comment(raw)
+        if not line:
+            continue
+        match = re.match(r"^\\$scriptsDir\\s*=\\s*(.+)$", line)
+        if match:
+            return unquote(match.group(1).strip())
+    return None
+
+def parse_gestures(path):
+    simple = []
+    complex_entries = []
+    if path is None or not path.exists():
+        return simple, complex_entries
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = strip_comment(raw)
+        if not line:
+            continue
+        match = re.match(r"^gesture\\s*=\\s*(.+)$", line)
+        if not match:
+            continue
+        payload = match.group(1).strip()
+        parts = [part.strip() for part in payload.split(",")]
+        if len(parts) >= 3 and parts[2] == "workspace":
+            try:
+                fingers = int(parts[0])
+            except ValueError:
+                complex_entries.append(payload)
+                continue
+            simple.append({
+                "fingers": fingers,
+                "direction": parts[1],
+                "action": "workspace",
+            })
+        else:
+            complex_entries.append(payload)
+    return simple, complex_entries
+
+WALLUST_FALLBACKS = {
+    "color12": "rgba(8db4ffff)",
+    "color10": "rgba(5f6578ff)",
+    "color15": "rgba(ffffffff)",
+    "color0": "rgba(0f111aff)",
+}
+
+def wallust_expr(value):
+    value = value.strip()
+    if not value.startswith("$"):
+        return None
+    var = value[1:].strip().lower()
+    if re.fullmatch(r"color\d+", var):
+        fallback = WALLUST_FALLBACKS.get(var)
+        if fallback:
+            return f"wallust_color({lua_string(var)}, {lua_string(fallback)})"
+        return f"wallust_color({lua_string(var)})"
+    return None
+
+def lua_value(value):
+    wallust_value = wallust_expr(value)
+    if wallust_value is not None:
+        return wallust_value
+    return scalar(value)
+
+def render_table(value, indent=4):
+    lines = []
+    for key, child in value.items():
+        if isinstance(child, dict):
+            lines.append(" " * indent + f"{key} = {{")
+            lines.extend(render_table(child, indent + 2))
+            lines.append(" " * indent + "},")
+        else:
+            rendered = lua_value(str(child))
+            if rendered is None:
+                continue
+            lines.append(" " * indent + f"{key} = {rendered},")
+    return lines
+
+def scalar(value, *, bool_words=True):
+    value = value.strip()
+    lower = value.lower()
+    if bool_words and lower in {"on", "true", "yes"}:
+        return "true"
+    if bool_words and lower in {"off", "false", "no"}:
+        return "false"
+    if re.fullmatch(r"[-+]?\d+(\.\d+)?", value):
+        return value
+    return lua_string(value)
+
+def normalize_field(name):
+    aliases = {
+        "floating": "float",
+        "pinned": "pin",
+        "fullscreenstate": "fullscreen_state",
+        "initialclass": "initial_class",
+        "initialtitle": "initial_title",
+        "xdgtag": "xdg_tag",
+        "onworkspace": "workspace",
+        "ignorealpha": "ignore_alpha",
+        "ignorezero": "ignore_zero",
+        "noanim": "no_anim",
+        "noblur": "no_blur",
+        "noshadow": "no_shadow",
+        "nofocus": "no_focus",
+        "noinitialfocus": "no_initial_focus",
+        "keepaspectratio": "keep_aspect_ratio",
+        "idleinhibit": "idle_inhibit",
+        "bordersize": "border_size",
+        "bordercolor": "border_color",
+        "roundingpower": "rounding_power",
+        "allowsinput": "allows_input",
+        "dimaround": "dim_around",
+        "focusonactivate": "focus_on_activate",
+        "nearestneighbor": "nearest_neighbor",
+        "nofollowmouse": "no_follow_mouse",
+        "noscreenshare": "no_screen_share",
+        "novrr": "no_vrr",
+        "forcergbx": "force_rgbx",
+        "suppressevent": "suppress_event",
+        "maxsize": "max_size",
+        "minsize": "min_size",
+        "persistentsize": "persistent_size",
+        "nomaxsize": "no_max_size",
+    }
+    compact = name.strip().replace("-", "_")
+    return aliases.get(compact.lower(), compact)
+
+MATCH_BOOL_FIELDS = {
+    "xwayland",
+    "float",
+    "fullscreen",
+    "pin",
+    "focus",
+    "group",
+    "modal",
+}
+
+MATCH_KEYS = {
+    "class", "title", "initialclass", "initialtitle", "tag", "xdgtag",
+    "xwayland", "floating", "fullscreen", "pinned", "focus", "group", "modal", "onworkspace",
+    "namespace", "address"
+}
+
+KNOWN_EFFECTS = {
+    "float", "floating", "tile", "tiled", "fullscreen", "fakefullscreen", "pin", "pinned",
+    "center", "nofocus", "noinitialfocus", "noanim", "noblur", "noshadow", "noborder",
+    "keepaspectratio", "forceopaque", "dimaround", "opaque", "opaque_toggle",
+    "blur", "ignorezero", "ignorealpha", "stayfocused"
+}
+
+EFFECT_PREFIXES = [
+    "workspace", "opacity", "size", "maxsize", "minsize", "move", "tag",
+    "idleinhibit", "idle_inhibit", "bordersize", "bordercolor", "rounding", "suppressevent",
+    "suppress_event", "animation", "blur", "ignorealpha", "ignorezero", "stayfocused"
+]
+
+def parse_rule_item(item, rule, rule_type="window"):
+    if item.startswith("match:"):
+        body = item[len("match:"):].strip()
+        if "=" in body:
+            key, value = body.split("=", 1)
+        else:
+            parts = body.split(None, 1)
+            if len(parts) != 2:
+                return
+            key, value = parts
+        key = normalize_field(key)
+        rule.setdefault("match", {})[key] = scalar(value, bool_words=key in MATCH_BOOL_FIELDS)
+        return
+
+    m = re.match(r"^([A-Za-z_]+):(.*)$", item)
+    if m and m.group(1).lower() in MATCH_KEYS:
+        k = normalize_field(m.group(1))
+        rule.setdefault("match", {})[k] = scalar(m.group(2).strip(), bool_words=k in MATCH_BOOL_FIELDS)
+        return
+
+    if rule_type == "layer" and m and m.group(1).lower() in ("namespace", "address"):
+        rule.setdefault("match", {})[m.group(1).lower()] = scalar(m.group(2).strip())
+        return
+
+    lower = item.lower()
+    if lower in ("float", "floating"):
+        rule["float"] = "true"
+    elif lower in ("pin", "pinned"):
+        rule["pin"] = "true"
+    elif lower == "fullscreen":
+        rule["fullscreen"] = "true"
+    elif lower in ("center", "center 1", "center on"):
+        rule["center"] = "true"
+    elif lower in ("noanim", "no_anim"):
+        rule["no_anim"] = "true"
+    elif lower in ("noblur", "no_blur"):
+        rule["no_blur"] = "true"
+    elif lower in ("noinitialfocus", "no_initial_focus"):
+        rule["no_initial_focus"] = "true"
+    elif lower in ("nofocus", "no_focus"):
+        rule["no_focus"] = "true"
+    elif lower in ("keepaspectratio", "keep_aspect_ratio"):
+        rule["keep_aspect_ratio"] = "true"
+    elif lower.startswith("workspace "):
+        rule["workspace"] = scalar(item[len("workspace "):].strip(), bool_words=False)
+    elif lower.startswith("opacity "):
+        rule["opacity"] = scalar(item[len("opacity "):].strip(), bool_words=False)
+    elif lower.startswith("size "):
+        rule["size"] = scalar(item[len("size "):].strip(), bool_words=False)
+    elif lower.startswith("move "):
+        rule["move"] = scalar(item[len("move "):].strip(), bool_words=False)
+    elif lower.startswith("tag "):
+        rule["tag"] = scalar(item[len("tag "):].strip(), bool_words=False)
+    elif lower.startswith("idleinhibit ") or lower.startswith("idle_inhibit "):
+        rule["idle_inhibit"] = scalar(item.split(None, 1)[1].strip(), bool_words=False)
+    elif lower.startswith("maxsize ") or lower.startswith("max_size "):
+        rule["max_size"] = scalar(item.split(None, 1)[1].strip(), bool_words=False)
+    elif lower.startswith("minsize ") or lower.startswith("min_size "):
+        rule["min_size"] = scalar(item.split(None, 1)[1].strip(), bool_words=False)
+    elif lower.startswith("suppressevent ") or lower.startswith("suppress_event "):
+        rule["suppress_event"] = scalar(item.split(None, 1)[1].strip(), bool_words=False)
+    elif rule_type == "layer" and lower == "blur":
+        rule["blur"] = "true"
+    elif rule_type == "layer" and lower == "ignorezero":
+        rule["ignore_zero"] = "true"
+    else:
+        parts = item.split(None, 1)
+        key = normalize_field(parts[0])
+        value = parts[1] if len(parts) > 1 else "on"
+        rule[key] = scalar(value, bool_words=key in MATCH_BOOL_FIELDS)
+
+def parse_block(lines, start_index):
+    start_line = lines[start_index].strip().lower()
+    rule_type = "layer" if "layer" in start_line else "window"
+    rule = {"match": {}}
+    i = start_index + 1
+    while i < len(lines):
+        line = strip_comment(lines[i])
+        if line == "}":
+            break
+        if line:
+            if "=" in line:
+                key, value = [part.strip() for part in line.split("=", 1)]
+                if key.startswith("match:"):
+                    match_key = normalize_field(key[len("match:"):])
+                    rule["match"][match_key] = scalar(value, bool_words=match_key in MATCH_BOOL_FIELDS)
+                elif key.lower() in MATCH_KEYS:
+                    match_key = normalize_field(key)
+                    rule["match"][match_key] = scalar(value, bool_words=match_key in MATCH_BOOL_FIELDS)
+                elif key == "name":
+                    rule["name"] = lua_string(value)
+                else:
+                    rule[normalize_field(key)] = scalar(value, bool_words=normalize_field(key) in MATCH_BOOL_FIELDS)
+        i += 1
+    return rule_type, rule, i
+
+def parse_rules(path, prefix, allow_legacy=True):
+    source_path = path if (path.exists() and has_active_hyprlang_content_py(path)) else (latest_legacy_file(path) if allow_legacy else None)
+    if source_path is None or not source_path.exists():
+        return []
+
+    if source_path != path:
+        print(f"[INFO] {path.name} not found or inactive at {path}; using legacy source {source_path}")
+
+    parsed = []
+    lines = source_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    i = 0
+    rule_index = 1
+    layer_index = 1
+    pending_name = None
+    while i < len(lines):
+        raw_line = lines[i]
+        name_hint = re.match(r"^\s*#\s*name\s*[:=]\s*(.+?)\s*$", raw_line)
+        if name_hint:
+            pending_name = lua_string(name_hint.group(1).strip())
+            i += 1
+            continue
+
+        line = strip_comment(raw_line)
+        if not line:
+            i += 1
+            continue
+
+        if re.match(r"^(windowrulev2|windowrule|layerrulev2|layerrule)\s*\{", line):
+            rule_type, rule, i = parse_block(lines, i)
+            if rule.get("match"):
+                if "name" not in rule:
+                    if pending_name is not None:
+                        rule["name"] = pending_name
+                    elif rule_type == "window":
+                        rule["name"] = lua_string(f"{prefix}-windowrule-{rule_index:03d}")
+                        rule_index += 1
+                    else:
+                        rule["name"] = lua_string(f"{prefix}-layerrule-{layer_index:03d}")
+                        layer_index += 1
+                pending_name = None
+                parsed.append((rule_type, rule))
+            i += 1
+            continue
+
+        match = re.match(r"^(windowrulev2|windowrule|layerrulev2|layerrule)\s*=\s*(.+)$", line)
+        if match:
+            rule_type = "layer" if "layer" in match.group(1) else "window"
+            rule = {"match": {}}
+            items = split_items(match.group(2))
+            # Handle legacy windowrule/layerrule syntax: e.g. windowrule = float, ^(pavucontrol)$
+            if not any(it.startswith("match:") or re.match(r"^[A-Za-z_]+:", it) for it in items):
+                if len(items) >= 2 and (items[-1].startswith("^") or "(" in items[-1] or not any(items[-1].lower().startswith(p) for p in EFFECT_PREFIXES)):
+                    if rule_type == "window":
+                        rule.setdefault("match", {})["class"] = scalar(items[-1])
+                    else:
+                        rule.setdefault("match", {})["namespace"] = scalar(items[-1])
+                    items = items[:-1]
+            for item in items:
+                parse_rule_item(item, rule, rule_type)
+            if rule.get("match"):
+                if "name" not in rule:
+                    if pending_name is not None:
+                        rule["name"] = pending_name
+                    elif rule_type == "window":
+                        rule["name"] = lua_string(f"{prefix}-windowrule-{rule_index:03d}")
+                        rule_index += 1
+                    else:
+                        rule["name"] = lua_string(f"{prefix}-layerrule-{layer_index:03d}")
+                        layer_index += 1
+                pending_name = None
+                parsed.append((rule_type, rule))
+            else:
+                pending_name = None
+            i += 1
+            continue
+
+        pending_name = None
+        i += 1
+    return parsed
+
+def emit_rule(rule_type, rule):
+    fn = "apply_window_rule" if rule_type == "window" else "apply_layer_rule"
+    lines = [f"{fn}({{"]
+    if "name" in rule:
+        lines.append(f"  name = {rule['name']},")
+    if rule.get("match"):
+        lines.append("  match = {")
+        for key, value in rule["match"].items():
+            lines.append(f"    {key} = {value},")
+        lines.append("  },")
+    for key, value in rule.items():
+        if key in {"name", "match"}:
+            continue
+        lines.append(f"  {key} = {value},")
+    lines.append("})")
+    return "\n".join(lines)
+
+def normalize_bind_mods(mods):
+    """Uppercase known modifiers for Hyprland Lua key chords.
+
+    Hyprlang accepts mixed-case modifiers (e.g. "shift"), but hl.bind keysyms
+    require canonical names like SHIFT/CTRL/ALT/SUPER.
+    """
+    if not mods:
+        return ""
+    tokens = re.split(r"\s+", mods.strip())
+    known = {
+        "super": "SUPER",
+        "super_l": "SUPER",
+        "super_r": "SUPER",
+        "shift": "SHIFT",
+        "shift_l": "SHIFT",
+        "shift_r": "SHIFT",
+        "ctrl": "CTRL",
+        "control": "CTRL",
+        "ctrl_l": "CTRL",
+        "ctrl_r": "CTRL",
+        "control_l": "CTRL",
+        "control_r": "CTRL",
+        "alt": "ALT",
+        "alt_l": "ALT",
+        "alt_r": "ALT",
+        "meta": "META",
+        "meta_l": "META",
+        "meta_r": "META",
+        "mod2": "MOD2",
+        "mod3": "MOD3",
+        "mod5": "MOD5",
+    }
+    normalized = []
+    for token in tokens:
+        if not token:
+            continue
+        key = token.lower()
+        normalized.append(known.get(key, token))
+    return " ".join(normalized)
+
+def parse_keybinds(path, *, variables=None, visited=None):
+    if not path.exists():
+        return []
+
+    if variables is None:
+        variables = {}
+    if visited is None:
+        visited = set()
+
+    try:
+        resolved = path.resolve()
+    except FileNotFoundError:
+        resolved = path
+
+    if resolved in visited:
+        return []
+    visited.add(resolved)
+
+    converted = []
+
+    def expand(value):
+        for _ in range(8):
+            new_value = value
+            for name, var_value in variables.items():
+                if name in {"files", "term", "edit", "editor", "visual", "Search_Engine", "search_engine"}:
+                    continue
+                new_value = new_value.replace(f"${name}", var_value)
+            if new_value == value:
+                return new_value
+            value = new_value
+        return value
+
+    for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = strip_comment(raw_line)
+        if not line:
+            continue
+
+        source_match = re.match(r"^source\s*=\s*(.+)$", line)
+        if source_match:
+            source_value = expand(source_match.group(1).strip())
+            source_value = os.path.expandvars(source_value)
+            source_path = Path(source_value).expanduser()
+            converted.extend(parse_keybinds(source_path, variables=variables, visited=visited))
+            continue
+
+        variable = re.match(r"^\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", line)
+        if variable:
+            variables[variable.group(1)] = expand(variable.group(2).strip())
+            continue
+
+        unbind = re.match(r"^unbind\s*=\s*(.+)$", line)
+        if unbind:
+            parts = [expand(part.strip()) for part in unbind.group(1).split(",")]
+            if len(parts) >= 2:
+                mods = normalize_bind_mods(parts[0])
+                converted.append(f"unbind({lua_string(mods)}, {lua_string(parts[1])})")
+            continue
+
+        bind = re.match(r"^(bind[a-z]*)\s*=\s*(.+)$", line)
+        if bind:
+            binder = bind.group(1)
+            parts = [expand(part.strip()) for part in bind.group(2).split(",")]
+            has_description = binder.startswith("bind") and "d" in binder[4:]
+            description = ""
+            if has_description and len(parts) >= 4:
+                mods, key = parts[0], parts[1]
+                description = parts[2]
+                dispatcher = parts[3]
+                args = ", ".join(part for part in parts[4:] if part)
+            elif len(parts) >= 3:
+                mods, key = parts[0], parts[1]
+                dispatcher = parts[2]
+                args = ", ".join(part for part in parts[3:] if part)
+            else:
+                continue
+
+            mods = normalize_bind_mods(mods)
+
+            opts = []
+            if description:
+                opts.append(f"description = {lua_string(description)}")
+            if "l" in binder:
+                opts.append("locked = true")
+            if "e" in binder or "r" in binder:
+                opts.append("[\"repeat\"] = true")
+            opts_text = ", { " + ", ".join(opts) + " }" if opts else ""
+
+            if dispatcher == "exec":
+                converted.append(f"bind({lua_string(mods)}, {lua_string(key)}, exec_cmd({lua_string(args)}){opts_text})")
+            else:
+                converted.append(f"bind({lua_string(mods)}, {lua_string(key)}, dispatch({lua_string(dispatcher)}, {lua_string(args)}){opts_text})")
+
+    return converted
+
+system_window_rules = [rule for rule in parse_rules(system_window_rules_path, "system-window") if rule[0] == "window"]
+system_layer_rules = [rule for rule in parse_rules(system_layer_rules_path, "system-layer") if rule[0] == "layer"]
+window_rules = [rule for rule in parse_rules(window_rules_path, "user-window") if rule[0] == "window"]
+layer_rules = [rule for rule in parse_rules(layer_rules_path, "user-layer") if rule[0] == "layer"]
+base_keybind_vars = {}
+parse_keybinds(user_defaults_path, variables=base_keybind_vars)
+system_keybinds = parse_keybinds(system_keybinds_path, variables=dict(base_keybind_vars))
+if system_laptops_path.exists():
+    system_keybinds.extend(parse_keybinds(system_laptops_path, variables=dict(base_keybind_vars)))
+keybinds = parse_keybinds(keybinds_path, variables=dict(base_keybind_vars))
+if laptops_path.exists():
+    keybinds.extend(parse_keybinds(laptops_path, variables=dict(base_keybind_vars)))
+system_env_entries = parse_env(system_env_path, allow_legacy=True)
+env_entries = parse_env(env_path, allow_legacy=not files_out["env"].exists())
+system_startup_entries = parse_startup(system_startup_path, variables=dict(base_keybind_vars))
+startup_entries = parse_startup(startup_path, variables=dict(base_keybind_vars))
+monitor_entries = parse_monitors(monitors_conf_path)
+workspace_entries = parse_workspaces(workspaces_conf_path)
+parsed_user_defaults = parse_user_defaults(user_defaults_path)
+resolved_edit = parsed_user_defaults.get("edit", os.getenv("EDITOR") or "nano")
+resolved_visual = parsed_user_defaults.get("visual", os.getenv("VISUAL") or "")
+resolved_term = parsed_user_defaults.get("term", "kitty")
+resolved_files = parsed_user_defaults.get("files", "thunar")
+resolved_search_engine = parsed_user_defaults.get(
+    "Search_Engine",
+    parsed_user_defaults.get("search_engine", "https://www.google.com/search?q={}"),
+)
+
+user_defaults_lines = [
+    "-- User defaults overrides (auto-generated).",
+    "-- Edit this file for terminal/editor/file-manager/search defaults in Lua mode.",
+    "-- Example:",
+    "-- KOOLDOTS_DEFAULTS.term = \"ghostty\"",
+    "",
+    "KOOLDOTS_DEFAULTS = KOOLDOTS_DEFAULTS or {}",
+    f"KOOLDOTS_DEFAULTS.edit = {lua_string(resolved_edit)}",
+    f"KOOLDOTS_DEFAULTS.visual = {lua_string(resolved_visual)}",
+    f"KOOLDOTS_DEFAULTS.term = {lua_string(resolved_term)}",
+    f"KOOLDOTS_DEFAULTS.files = {lua_string(resolved_files)}",
+    f"KOOLDOTS_DEFAULTS.search_engine = {lua_string(resolved_search_engine)}",
+    f"KOOLDOTS_DEFAULTS.Search_Engine = {lua_string(resolved_search_engine)}",
+]
+if files_out["user_defaults"].exists():
+    print(f"[INFO] Preserving existing custom Lua user defaults file: {files_out['user_defaults']}")
+elif has_active_hyprlang_content_py(user_defaults_path):
+    write_file(files_out["user_defaults"], user_defaults_lines)
+else:
+    write_file(files_out["user_defaults"], user_defaults_lines)
+
+def files_match(p1, p2):
+    if p1 is None or p2 is None or not p1.exists() or not p2.exists():
+        return False
+    try:
+        return p1.read_text(encoding="utf-8", errors="ignore").strip() == p2.read_text(encoding="utf-8", errors="ignore").strip()
+    except Exception:
+        return False
+
+def lua_file_is_generated(lua_path):
+    if lua_path is None or not lua_path.exists():
+        return False
+    try:
+        content = lua_path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return False
+    return any(marker in content for marker in [
+        "auto-generated",
+        "Converted from",
+        "No active entries were found",
+        "Source reference from",
+        "User window-rule overrides template",
+        "User layer-rule overrides template",
+        "User startup overrides template",
+        "User keybind overrides template",
+        "User defaults overrides",
+        "No active window rules were found",
+        "No active layer rules were found",
+        "No active startup entries were found",
+        "No active env entries were found",
+    ])
+
+if files_out["monitors"].exists():
+    print(f"[INFO] Preserving existing custom Lua monitors file: {files_out['monitors']}")
+elif monitor_entries and (src_monitors_conf_path is None or not src_monitors_conf_path.exists() or not files_match(monitors_conf_path, src_monitors_conf_path)):
+    monitor_lines = [
+        "-- Monitors migrated from monitors.conf (auto-generated).",
+        "-- Edit ~/.config/hypr/UserConfigs/monitors.lua to modify monitors in Lua mode.",
+        "",
+    ]
+    for spec in monitor_entries:
+        monitor_lines.append(emit_monitor(spec))
+        monitor_lines.append("")
+    write_file(files_out["monitors"], monitor_lines)
+elif not files_out["monitors"].exists():
+    if src_user_lua_monitors_path and src_user_lua_monitors_path.exists():
+        files_out["monitors"].write_text(src_user_lua_monitors_path.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"[OK] Ensured default monitors template: {files_out['monitors']}")
+else:
+    print(f"[INFO] Keeping existing {files_out['monitors']}")
+
+if files_out["workspaces"].exists():
+    print(f"[INFO] Preserving existing custom Lua workspaces file: {files_out['workspaces']}")
+elif workspace_entries and (src_workspaces_conf_path is None or not src_workspaces_conf_path.exists() or not files_match(workspaces_conf_path, src_workspaces_conf_path)):
+    workspace_lines = [
+        "-- Workspace rules migrated from workspaces.conf (auto-generated).",
+        "-- Edit ~/.config/hypr/UserConfigs/workspaces.lua to modify workspace rules in Lua mode.",
+        "",
+    ]
+    for spec in workspace_entries:
+        workspace_lines.append(emit_workspace_rule(spec))
+        workspace_lines.append("")
+    write_file(files_out["workspaces"], workspace_lines)
+elif not files_out["workspaces"].exists():
+    if src_user_lua_workspaces_path and src_user_lua_workspaces_path.exists():
+        files_out["workspaces"].write_text(src_user_lua_workspaces_path.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"[OK] Ensured default workspaces template: {files_out['workspaces']}")
+else:
+    print(f"[INFO] Keeping existing {files_out['workspaces']}")
+system_env_lines = [
+    "-- System defaults migrated from configs/ENVariables.conf (auto-generated).",
+    "-- Edit this file to keep your previous configs/ ENVariables customizations in Lua mode.",
+    "-- Example:",
+    "-- hl.env(\"QT_QPA_PLATFORMTHEME\", \"qt6ct\")",
+    "",
+]
+if src_configs_dir and (src_configs_dir / "system_env.lua").exists():
+    files_out["system_env"].write_text((src_configs_dir / "system_env.lua").read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"[OK] Ensured canonical system file: {files_out['system_env']}")
+elif system_env_entries:
+    system_env_lines.append("-- Converted from configs/ENVariables.conf")
+    for key, value in system_env_entries:
+        system_env_lines.append(f"hl.env({lua_string(key)}, {lua_string(value)})")
+    write_file(files_out["system_env"], system_env_lines)
+else:
+    if files_out["system_env"].exists():
+        print(f"[INFO] No active env entries found in {system_env_path}; keeping existing {files_out['system_env']}")
+    else:
+        system_env_lines.append("-- No active env entries were found in configs/ENVariables.conf.")
+        write_file(files_out["system_env"], system_env_lines)
+
+startup_readiness = (
+    "runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}; "
+    "export XDG_RUNTIME_DIR=\"$runtime\"; "
+    "for _ in $(seq 1 60); do "
+    "if [ -n \"$WAYLAND_DISPLAY\" ] && [ -S \"$runtime/$WAYLAND_DISPLAY\" ]; then break; fi; "
+    "for sock in \"$runtime\"/wayland-[0-9]*; do [ -S \"$sock\" ] || continue; "
+    "case \"$(basename \"$sock\")\" in *awww*) continue ;; esac; "
+    "export WAYLAND_DISPLAY=\"$(basename \"$sock\")\"; break; done; "
+    "sleep 0.1; done; "
+    "if [ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]; then "
+    "for hypr_sock in \"$runtime/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock\" \"$runtime/hypr/.socket.sock\"; do [ -S \"$hypr_sock\" ] && break; done; "
+    "sleep 0.1; fi"
+)
+
+system_startup_lines = [
+    "-- System defaults migrated from configs/Startup_Apps.conf (auto-generated).",
+    "-- Add commands with exec_once(\"your command\")",
+    "-- Example:",
+    "-- exec_once(\"swaync\")",
+    "",
+    "local session = os.getenv(\"HYPRLAND_INSTANCE_SIGNATURE\") or \"default\"",
+    "",
+    "local function shell_quote(value)",
+    "  return \"'\" .. tostring(value):gsub(\"'\", \"'\\\\''\") .. \"'\"",
+    "end",
+    "",
+    "local function exec_once(cmd)",
+    "  local key = cmd:gsub(\"[^%w_.-]\", \"_\"):sub(1, 80)",
+    "  local marker = \"/tmp/hypr-lua-system-exec-once-\" .. session .. \"-\" .. key",
+    "  local log = \"/tmp/hypr-lua-system-startup-\" .. key .. \".log\"",
+    f"  local readiness = {lua_string(startup_readiness)}",
+    "  local inner = readiness .. \"; \" .. cmd",
+    "  local script = \"[ -e \" .. shell_quote(marker) .. \" ] || { touch \" .. shell_quote(marker) .. \" && sh -lc \" .. shell_quote(inner) .. \" >>\" .. shell_quote(log) .. \" 2>&1 & }\"",
+    "  os.execute(\"sh -lc \" .. shell_quote(script))",
+    "end",
+    "",
+]
+if src_configs_dir and (src_configs_dir / "system_startup.lua").exists():
+    files_out["system_startup"].write_text((src_configs_dir / "system_startup.lua").read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"[OK] Ensured canonical system file: {files_out['system_startup']}")
+elif system_startup_entries:
+    system_startup_lines.append("-- Converted from configs/Startup_Apps.conf")
+    system_startup_lines.append("local startup_commands = {")
+    for cmd in system_startup_entries:
+        system_startup_lines.append(f"  {lua_string(cmd)},")
+    system_startup_lines.extend([
+        "}",
+        "",
+        "local function run_startup_commands()",
+        "  for _, cmd in ipairs(startup_commands) do",
+        "    exec_once(cmd)",
+        "  end",
+        "end",
+        "",
+        "if hl and hl.on then",
+        "  hl.on(\"hyprland.start\", run_startup_commands)",
+        "else",
+        "  run_startup_commands()",
+        "end",
+    ])
+    write_file(files_out["system_startup"], system_startup_lines)
+else:
+    if files_out["system_startup"].exists():
+        print(f"[INFO] No active startup entries found in {system_startup_path}; keeping existing {files_out['system_startup']}")
+    else:
+        system_startup_lines.append("-- No active startup entries were found in configs/Startup_Apps.conf.")
+        write_file(files_out["system_startup"], system_startup_lines)
+
+system_window_lines = [
+    "-- System defaults migrated from configs/WindowRules.conf (auto-generated).",
+    "-- Add additional rules with apply_window_rule({...}).",
+    "-- Example:",
+    "-- apply_window_rule({",
+    "--   name = \"My System Rule\",",
+    "--   match = { class = \"^pavucontrol$\" },",
+    "--   float = true,",
+    "-- })",
+    "",
+    "local function apply_window_rule(rule)",
+    "  if hl.window_rule then",
+    "    hl.window_rule(rule)",
+    "  end",
+    "end",
+    "",
+]
+if src_configs_dir and (src_configs_dir / "system_window_rules.lua").exists():
+    files_out["system_window_rules"].write_text((src_configs_dir / "system_window_rules.lua").read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"[OK] Ensured canonical system file: {files_out['system_window_rules']}")
+elif (SRC_HYPR_DIR / "configs" / "system_window_rules.lua").exists():
+    files_out["system_window_rules"].write_text((SRC_HYPR_DIR / "configs" / "system_window_rules.lua").read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"[OK] Ensured canonical system file: {files_out['system_window_rules']}")
+elif system_window_rules:
+    system_window_lines.append("-- Converted from configs/WindowRules.conf")
+    for rule_type, rule in system_window_rules:
+        system_window_lines.append(emit_rule(rule_type, rule))
+        system_window_lines.append("")
+    write_file(files_out["system_window_rules"], system_window_lines)
+else:
+    system_window_lines.append("-- No active window rules were found in configs/WindowRules.conf.")
+    write_file(files_out["system_window_rules"], system_window_lines)
+
+system_layer_lines = [
+    "-- System defaults migrated from configs/LayerRules.conf (auto-generated).",
+    "-- Add additional rules with apply_layer_rule({...}).",
+    "-- Example:",
+    "-- apply_layer_rule({",
+    "--   name = \"My Layer Rule\",",
+    "--   match = { namespace = \"rofi\" },",
+    "--   blur = true,",
+    "-- })",
+    "",
+    "local function apply_layer_rule(rule)",
+    "  if hl.layer_rule then",
+    "    hl.layer_rule(rule)",
+    "  end",
+    "end",
+    "",
+]
+if src_configs_dir and (src_configs_dir / "system_layer_rules.lua").exists():
+    files_out["system_layer_rules"].write_text((src_configs_dir / "system_layer_rules.lua").read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"[OK] Ensured canonical system file: {files_out['system_layer_rules']}")
+elif system_layer_rules:
+    system_layer_lines.append("-- Converted from configs/LayerRules.conf")
+    for rule_type, rule in system_layer_rules:
+        system_layer_lines.append(emit_rule(rule_type, rule))
+        system_layer_lines.append("")
+    write_file(files_out["system_layer_rules"], system_layer_lines)
+else:
+    system_layer_lines.append("-- No active layer rules were found in configs/LayerRules.conf.")
+    write_file(files_out["system_layer_rules"], system_layer_lines)
+
+system_keybind_lines = [
+    "-- System defaults migrated from configs/Keybinds.conf (auto-generated).",
+    "-- Add keybinds with bind(\"MODS\", \"KEY\", fn, opts).",
+    "-- Example:",
+    "-- bind(\"SUPER\", \"Z\", exec_cmd(\"thunar\"), { description = \"Open file manager\" })",
+    "",
+    "local dsp = hl.dsp or hl",
+    "local function resolve_cmd(cmd)",
+    "  local defaults = rawget(_G, \"KOOLDOTS_DEFAULTS\") or {}",
+    "  local resolved_term = defaults.term or os.getenv(\"TERMINAL\") or \"kitty\"",
+    "  local resolved_files = defaults.files or \"thunar\"",
+    "  local resolved_edit = defaults.edit or os.getenv(\"EDITOR\") or \"nano\"",
+    "  local resolved_visual = defaults.visual or os.getenv(\"VISUAL\") or \"\"",
+    "  cmd = tostring(cmd)",
+    "  cmd = cmd:gsub(\"%$term\", resolved_term)",
+    "  cmd = cmd:gsub(\"%$files\", resolved_files)",
+    "  cmd = cmd:gsub(\"%$edit\", resolved_edit)",
+    "  cmd = cmd:gsub(\"%$visual\", resolved_visual)",
+    "  return cmd",
+    "end",
+    "",
+    "local function exec_cmd(cmd)",
+    "  local resolved = resolve_cmd(cmd)",
+    "  if dsp and dsp.exec_cmd then",
+    "    return dsp.exec_cmd(resolved)",
+    "  end",
+    "  return function() hl.exec_cmd(resolved) end",
+    "end",
+    "",
+    "local function shell_quote(value)",
+    "  return \"'\" .. tostring(value):gsub(\"'\", \"'\\\\''\") .. \"'\"",
+    "end",
+    "",
+    "local function raw_dispatch_cmd(command)",
+    "  if dsp and dsp.exec_raw then",
+    "    return dsp.exec_raw(tostring(command))",
+    "  end",
+    "  local expression = \"hl.dsp.exec_raw(\" .. string.format(\"%q\", tostring(command)) .. \")\"",
+    "  return exec_cmd(\"hyprctl dispatch \" .. shell_quote(expression))",
+    "end",
+    "",
+    "local function trim(value)",
+    "  return (value or \"\"):gsub(\"^%s+\", \"\"):gsub(\"%s+$\", \"\")",
+    "end",
+    "",
+    "local function normalize_mods(mods)",
+    "  mods = trim(mods)",
+    "  if mods == \"\" then",
+    "    return \"\"",
+    "  end",
+    "  local known = {",
+    "    super = \"SUPER\",",
+    "    super_l = \"SUPER_L\",",
+    "    super_r = \"SUPER_R\",",
+    "    shift = \"SHIFT\",",
+    "    shift_l = \"SHIFT_L\",",
+    "    shift_r = \"SHIFT_R\",",
+    "    ctrl = \"CTRL\",",
+    "    control = \"CTRL\",",
+    "    ctrl_l = \"CTRL_L\",",
+    "    ctrl_r = \"CTRL_R\",",
+    "    control_l = \"CTRL_L\",",
+    "    control_r = \"CTRL_R\",",
+    "    alt = \"ALT\",",
+    "    alt_l = \"ALT_L\",",
+    "    alt_r = \"ALT_R\",",
+    "    meta = \"META\",",
+    "    meta_l = \"META_L\",",
+    "    meta_r = \"META_R\",",
+    "    mod2 = \"MOD2\",",
+    "    mod3 = \"MOD3\",",
+    "    mod5 = \"MOD5\",",
+    "  }",
+    "  local parts = {}",
+    "  for token in mods:gmatch(\"%S+\") do",
+    "    parts[#parts + 1] = known[token:lower()] or token",
+    "  end",
+    "  return table.concat(parts, \" \")",
+    "end",
+    "",
+    "local function chord(mods, key)",
+    "  mods = normalize_mods(mods):gsub(\"%s+\", \" + \")",
+    "  key = trim(key)",
+    "  if mods == \"\" then",
+    "    return key",
+    "  end",
+    "  return mods .. \" + \" .. key",
+    "end",
+    "",
+    "local function key_variants(key, mods)",
+    "  key = trim(key):gsub(\"^xf86\", \"XF86\")",
+    "  local key_aliases = {",
+    "    XF86AudioPlayPause = \"XF86AudioPlay\",",
+    "    XF86audiolowervolume = \"XF86AudioLowerVolume\",",
+    "    XF86audiomute = \"XF86AudioMute\",",
+    "    XF86audioraisevolume = \"XF86AudioRaiseVolume\",",
+    "    XF86audiostop = \"XF86AudioStop\",",
+    "  }",
+    "  key = key_aliases[key] or key",
+    "  local shifted_number_keys = {",
+    "    [\"code:10\"] = \"exclam\",",
+    "    [\"code:11\"] = \"at\",",
+    "    [\"code:12\"] = \"numbersign\",",
+    "    [\"code:13\"] = \"dollar\",",
+    "    [\"code:14\"] = \"percent\",",
+    "    [\"code:15\"] = \"asciicircum\",",
+    "    [\"code:16\"] = \"ampersand\",",
+    "    [\"code:17\"] = \"asterisk\",",
+    "    [\"code:18\"] = \"parenleft\",",
+    "    [\"code:19\"] = \"parenright\",",
+    "  }",
+    "  local number_keys = {",
+    "    [\"code:10\"] = \"1\",",
+    "    [\"code:11\"] = \"2\",",
+    "    [\"code:12\"] = \"3\",",
+    "    [\"code:13\"] = \"4\",",
+    "    [\"code:14\"] = \"5\",",
+    "    [\"code:15\"] = \"6\",",
+    "    [\"code:16\"] = \"7\",",
+    "    [\"code:17\"] = \"8\",",
+    "    [\"code:18\"] = \"9\",",
+    "    [\"code:19\"] = \"0\",",
+    "  }",
+    "  if mods:upper():match(\"SHIFT\") and shifted_number_keys[key] then",
+    "    local number_key = number_keys[key]",
+    "    if number_key then",
+    "      return { shifted_number_keys[key], number_key }",
+    "    end",
+    "    return { shifted_number_keys[key] }",
+    "  end",
+    "  if number_keys[key] then",
+    "    return { number_keys[key] }",
+    "  end",
+    "  return { key }",
+    "end",
+    "",
+    "local function workspace_value(value)",
+    "  value = trim(value)",
+    "  return tonumber(value) or value",
+    "end",
+    "",
+    "local function direction(value)",
+    "  local directions = {",
+    "    l = \"left\",",
+    "    r = \"right\",",
+    "    u = \"up\",",
+    "    d = \"down\",",
+    "    left = \"left\",",
+    "    right = \"right\",",
+    "    up = \"up\",",
+    "    down = \"down\",",
+    "  }",
+    "  return directions[trim(value)] or trim(value)",
+    "end",
+    "",
+    "local function dispatch(name, args)",
+    "  local window_api = (dsp and dsp.window) or hl.window or {}",
+    "  name = trim(name)",
+    "  args = trim(args)",
+    "  if name == \"exec\" then",
+    "    return exec_cmd(args)",
+    "  end",
+    "  if name == \"killactive\" and window_api.close then",
+    "    return window_api.close()",
+    "  end",
+    "  if name == \"fullscreen\" and window_api.fullscreen then",
+    "    if args == \"1\" then",
+    "      return window_api.fullscreen({ mode = \"maximized\" })",
+    "    end",
+    "    return window_api.fullscreen({ mode = \"fullscreen\" })",
+    "  end",
+    "  if name == \"movefocus\" and dsp and dsp.focus then",
+    "    return function()",
+    "      local ok, dispatcher = pcall(dsp.focus, { direction = direction(args) })",
+    "      if ok and dispatcher then",
+    "        hl.dispatch(dispatcher)",
+    "      end",
+    "    end",
+    "  end",
+    "  if name == \"cyclenext\" then",
+    "    if args == \"prev\" or args == \"b\" then",
+    "      return exec_cmd(\"${XDG_CONFIG_HOME:-$HOME/.config}/hypr/scripts/LuaCycleWindow.sh previous\")",
+    "    end",
+    "    return exec_cmd(\"${XDG_CONFIG_HOME:-$HOME/.config}/hypr/scripts/LuaCycleWindow.sh next\")",
+    "  end",
+    "  if name == \"swapwindow\" then",
+    "    local swap_direction = trim(args)",
+    "    if swap_direction == \"\" then",
+    "      return nil",
+    "    end",
+    "    return exec_cmd(\"${XDG_CONFIG_HOME:-$HOME/.config}/hypr/scripts/LuaSwapWindow.sh \" .. swap_direction)",
+    "  end",
+    "  if name == \"workspace\" and dsp and dsp.focus then",
+    "    return function() hl.dispatch(dsp.focus({ workspace = workspace_value(args) })) end",
+    "  end",
+    "  if name == \"movetoworkspace\" and window_api.move then",
+    "    return function() hl.dispatch(window_api.move({ workspace = workspace_value(args) })) end",
+    "  end",
+    "  if name == \"movetoworkspacesilent\" and window_api.move then",
+    "    return function() hl.dispatch(window_api.move({ workspace = workspace_value(args), follow = false })) end",
+    "  end",
+    "  if name == \"togglefloating\" and window_api.float then",
+    "    return function() hl.dispatch(window_api.float({ action = \"toggle\" })) end",
+    "  end",
+    "  if name == \"resizewindow\" and window_api.resize then",
+    "    return window_api.resize()",
+    "  end",
+    "  if name == \"resizeactive\" and window_api.resize then",
+    "    local x, y = args:match(\"^(%-?%d+)%s+(%-?%d+)$\")",
+    "    if x and y then",
+    "      return window_api.resize({ x = tonumber(x) or 0, y = tonumber(y) or 0, relative = true })",
+    "    end",
+    "  end",
+    "  if name == \"movewindow\" and args == \"\" and window_api.drag then",
+    "    return window_api.drag()",
+    "  end",
+    "  if args ~= \"\" then",
+    "    return raw_dispatch_cmd(name .. \" \" .. args)",
+    "  end",
+    "  return raw_dispatch_cmd(name)",
+    "end",
+    "",
+    "local function bind(mods, key, fn, opts)",
+    "  local seen = {}",
+    "  for _, key_variant in ipairs(key_variants(key, mods)) do",
+    "    local key_chord = chord(mods, key_variant)",
+    "    if not seen[key_chord] then",
+    "      seen[key_chord] = true",
+    "      if opts then",
+    "        hl.bind(key_chord, fn, opts)",
+    "      else",
+    "        hl.bind(key_chord, fn)",
+    "      end",
+    "    end",
+    "  end",
+    "end",
+    "",
+    "local function unbind(mods, key)",
+    "  if hl.unbind then",
+    "    local seen = {}",
+    "    for _, key_variant in ipairs(key_variants(key, mods)) do",
+    "      local key_chord = chord(mods, key_variant)",
+    "      if not seen[key_chord] then",
+    "        seen[key_chord] = true",
+    "        local ok = pcall(hl.unbind, mods, key_variant)",
+    "        if not ok then",
+    "          pcall(hl.unbind, key_chord)",
+    "        end",
+    "      end",
+    "    end",
+    "  end",
+    "end",
+    "",
+]
+if src_configs_dir and (src_configs_dir / "system_keybinds.lua").exists():
+    files_out["system_keybinds"].write_text((src_configs_dir / "system_keybinds.lua").read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"[OK] Ensured canonical system file: {files_out['system_keybinds']}")
+elif system_keybinds:
+    system_keybind_lines.append("-- Converted from configs/Keybinds.conf")
+    system_keybind_lines.extend(system_keybinds)
+    write_file(files_out["system_keybinds"], system_keybind_lines)
+else:
+    if files_out["system_keybinds"].exists():
+        print(f"[INFO] No active keybind entries found in {system_keybinds_path}; keeping existing {files_out['system_keybinds']}")
+    else:
+        system_keybind_lines.append("-- No active keybind entries were found in configs/Keybinds.conf.")
+        write_file(files_out["system_keybinds"], system_keybind_lines)
+
+for name, source in [
+    ("system_settings", system_settings_path),
+    ("system_laptops", system_laptops_path),
+]:
+    title = f"-- {name.replace('_', ' ').title()} (auto-generated)."
+    lines = [
+        title,
+        "-- This file keeps migrated settings split from user overrides.",
+        "-- Add only Lua entries here.",
+        "-- Example:",
+        "-- hl.config({ general = { gaps_in = 4, gaps_out = 8 } })",
+        "",
+    ]
+    source_path = source if source.exists() else latest_legacy_file(source)
+    if source_path and source_path != source:
+        print(f"[INFO] {source.name} not found at {source}; using legacy source {source_path}")
+
+    if src_configs_dir and (src_configs_dir / f"{name}.lua").exists():
+        files_out[name].write_text((src_configs_dir / f"{name}.lua").read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"[OK] Ensured canonical system file: {files_out[name]}")
+        continue
+
+    if name == "system_settings":
+        system_settings_lines = [
+            title,
+            "-- System settings for the Lua workflow.",
+            "-- Loaded by user_overrides.lua on every Hyprland session start.",
+            "-- Delegates to lua/settings.lua which contains the canonical settings.",
+            "",
+            'local configHome = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")',
+            'local hyprDir = configHome .. "/hypr"',
+            'local settings_path = hyprDir .. "/lua/settings.lua"',
+            "local ok, err = pcall(dofile, settings_path)",
+            "if not ok then",
+            '  print("[ERROR] system_settings: failed to load lua/settings.lua: " .. tostring(err))',
+            "end",
+        ]
+        write_file(files_out[name], system_settings_lines)
+        continue
+
+    reference = source_examples(source_path) if source_path else []
+    if reference:
+        lines.extend([
+            f"-- Source reference from {source_path.name} (hyprlang):",
+            *reference,
+        ])
+    else:
+        lines.append(f"-- No active entries were found in {source.name}.")
+    write_file(files_out[name], lines)
+
+env_lines = [
+    "-- User ENV overrides (auto-generated).",
+    "-- Add values using: hl.env(\"KEY\", \"VALUE\")",
+    "-- Example:",
+    "-- hl.env(\"MOZ_ENABLE_WAYLAND\", \"1\")",
+    "",
+]
+if files_out["env"].exists() and not lua_file_is_generated(files_out["env"]):
+    print(f"[INFO] Preserving existing custom Lua env file: {files_out['env']}")
+elif env_entries:
+    env_lines.append("-- Converted from ENVariables.conf")
+    for key, value in env_entries:
+        env_lines.append(f"hl.env({lua_string(key)}, {lua_string(value)})")
+    write_file(files_out["env"], env_lines)
+else:
+    if not files_out["env"].exists():
+        env_lines.extend([
+            "-- No active env entries were found in ENVariables.conf.",
+            "-- Uncomment and customize examples below:",
+            '-- hl.env("GDK_SCALE", "1")',
+            '-- hl.env("QT_SCALE_FACTOR", "1")',
+        ])
+        write_file(files_out["env"], env_lines)
+    else:
+        print(f"[INFO] Keeping existing {files_out['env']}")
+
+startup_lines = [
+    "-- User startup overrides (auto-generated).",
+    "-- Add commands with exec_once(\"your command\")",
+    "-- Example:",
+    "-- exec_once(\"${XDG_CONFIG_HOME:-$HOME/.config}/hypr/UserScripts/MyStartup.sh\")",
+    "",
+    "local user_startup_helper = nil",
+    "do",
+    "  local source = (debug.getinfo(1, \"S\") or {}).source or \"\"",
+    "  local source_path = source:match(\"^@(.+)$\")",
+    "  local source_dir = source_path and source_path:match(\"^(.*)/[^/]+$\") or nil",
+    "  local home = os.getenv(\"HOME\") or \"\"",
+    "  local candidate_paths = {",
+    "    source_dir and (source_dir .. \"/../lua/user_startup_helper.lua\") or nil,",
+    "    home ~= \"\" and (home .. \"/.config/hypr/lua/user_startup_helper.lua\") or nil,",
+    "    home ~= \"\" and (home .. \"/.config/hypr/user_startup_helper.lua\") or nil,",
+    "  }",
+    "",
+    "  local tried_paths = {}",
+    "  for _, helper_path in ipairs(candidate_paths) do",
+    "    if helper_path then",
+    "      table.insert(tried_paths, helper_path)",
+    "      local f = io.open(helper_path, \"r\")",
+    "      if f then",
+    "        f:close()",
+    "        local loaded_ok, loaded_helpers = pcall(dofile, helper_path)",
+    "        if loaded_ok and type(loaded_helpers) == \"table\" and loaded_helpers.exec_once then",
+    "          user_startup_helper = loaded_helpers",
+    "          break",
+    "        end",
+    "      end",
+    "    end",
+    "  end",
+    "",
+    "  if not user_startup_helper then",
+    "    error(\"Failed to load user_startup_helper.lua from: \" .. table.concat(tried_paths, \", \"))",
+    "  end",
+    "end",
+    "local exec_once = user_startup_helper.exec_once",
+    "",
+]
+if files_out["startup"].exists() and not lua_file_is_generated(files_out["startup"]):
+    print(f"[INFO] Preserving existing custom Lua startup file: {files_out['startup']}")
+elif startup_entries:
+    startup_lines.append("-- Converted from Startup_Apps.conf")
+    startup_lines.append("local startup_commands = {")
+    for cmd in startup_entries:
+        startup_lines.append(f"  {lua_string(cmd)},")
+    startup_lines.extend([
+        "}",
+        "",
+        "local function run_startup_commands()",
+        "  for _, cmd in ipairs(startup_commands) do",
+        "    exec_once(cmd)",
+        "  end",
+        "end",
+        "",
+        "if hl and hl.on then",
+        "  hl.on(\"hyprland.start\", run_startup_commands)",
+        "else",
+        "  run_startup_commands()",
+        "end",
+    ])
+    write_file(files_out["startup"], startup_lines)
+else:
+    if not files_out["startup"].exists():
+        startup_lines.extend([
+            "-- No active startup entries were found in Startup_Apps.conf.",
+            "-- exec_once(\"nm-applet --indicator\")",
+        ])
+        write_file(files_out["startup"], startup_lines)
+    else:
+        print(f"[INFO] Keeping existing {files_out['startup']}")
+
+window_lines = [
+    "-- User window rule overrides (auto-generated).",
+    "-- Add your own rules with apply_window_rule({...})",
+    "-- Example:",
+    "-- apply_window_rule({",
+    "--   name = \"My Float Rule\",",
+    "--   match = { class = \"^pavucontrol$\" },",
+    "--   float = true,",
+    "--   center = true,",
+    "-- })",
+    "",
+    "local user_window_rules_helper = nil",
+    "do",
+    "  local source = (debug.getinfo(1, \"S\") or {}).source or \"\"",
+    "  local source_path = source:match(\"^@(.+)$\")",
+    "  local source_dir = source_path and source_path:match(\"^(.*)/[^/]+$\") or nil",
+    "  local home = os.getenv(\"HOME\") or \"\"",
+    "  local candidate_paths = {",
+    "    source_dir and (source_dir .. \"/../lua/user_window_rules_helper.lua\") or nil,",
+    "    home ~= \"\" and (home .. \"/.config/hypr/lua/user_window_rules_helper.lua\") or nil,",
+    "    home ~= \"\" and (home .. \"/.config/hypr/user_window_rules_helper.lua\") or nil,",
+    "  }",
+    "",
+    "  local tried_paths = {}",
+    "  for _, helper_path in ipairs(candidate_paths) do",
+    "    if helper_path then",
+    "      table.insert(tried_paths, helper_path)",
+    "      local f = io.open(helper_path, \"r\")",
+    "      if f then",
+    "        f:close()",
+    "        local loaded_ok, loaded_helpers = pcall(dofile, helper_path)",
+    "        if loaded_ok and type(loaded_helpers) == \"table\" and loaded_helpers.apply_window_rule then",
+    "          user_window_rules_helper = loaded_helpers",
+    "          break",
+    "        end",
+    "      end",
+    "    end",
+    "  end",
+    "",
+    "  if not user_window_rules_helper then",
+    "    error(\"Failed to load user_window_rules_helper.lua from: \" .. table.concat(tried_paths, \", \"))",
+    "  end",
+    "end",
+    "local apply_window_rule = user_window_rules_helper.apply_window_rule",
+    "",
+]
+if files_out["window_rules"].exists() and not lua_file_is_generated(files_out["window_rules"]):
+    print(f"[INFO] Preserving existing custom Lua window rules file: {files_out['window_rules']}")
+elif window_rules:
+    window_lines.append("-- Converted from WindowRules.conf")
+    for rule_type, rule in window_rules:
+        window_lines.append(emit_rule(rule_type, rule))
+        window_lines.append("")
+    write_file(files_out["window_rules"], window_lines)
+else:
+    if not files_out["window_rules"].exists():
+        window_lines.append("-- No active window rules were found in WindowRules.conf.")
+        write_file(files_out["window_rules"], window_lines)
+    else:
+        print(f"[INFO] Keeping existing {files_out['window_rules']}")
+
+layer_lines = [
+    "-- User layer rule overrides (auto-generated).",
+    "-- Add your own rules with apply_layer_rule({...})",
+    "-- Example:",
+    "-- apply_layer_rule({",
+    "--   name = \"My Layer Rule\",",
+    "--   match = { namespace = \"rofi\" },",
+    "--   blur = true,",
+    "-- })",
+    "",
+    "local user_layer_rules_helper = nil",
+    "do",
+    "  local source = (debug.getinfo(1, \"S\") or {}).source or \"\"",
+    "  local source_path = source:match(\"^@(.+)$\")",
+    "  local source_dir = source_path and source_path:match(\"^(.*)/[^/]+$\") or nil",
+    "  local home = os.getenv(\"HOME\") or \"\"",
+    "  local candidate_paths = {",
+    "    source_dir and (source_dir .. \"/../lua/user_layer_rules_helper.lua\") or nil,",
+    "    home ~= \"\" and (home .. \"/.config/hypr/lua/user_layer_rules_helper.lua\") or nil,",
+    "    home ~= \"\" and (home .. \"/.config/hypr/user_layer_rules_helper.lua\") or nil,",
+    "  }",
+    "",
+    "  local tried_paths = {}",
+    "  for _, helper_path in ipairs(candidate_paths) do",
+    "    if helper_path then",
+    "      table.insert(tried_paths, helper_path)",
+    "      local f = io.open(helper_path, \"r\")",
+    "      if f then",
+    "        f:close()",
+    "        local loaded_ok, loaded_helpers = pcall(dofile, helper_path)",
+    "        if loaded_ok and type(loaded_helpers) == \"table\" and loaded_helpers.apply_layer_rule then",
+    "          user_layer_rules_helper = loaded_helpers",
+    "          break",
+    "        end",
+    "      end",
+    "    end",
+    "  end",
+    "",
+    "  if not user_layer_rules_helper then",
+    "    error(\"Failed to load user_layer_rules_helper.lua from: \" .. table.concat(tried_paths, \", \"))",
+    "  end",
+    "end",
+    "local apply_layer_rule = user_layer_rules_helper.apply_layer_rule",
+    "",
+]
+if files_out["layer_rules"].exists() and not lua_file_is_generated(files_out["layer_rules"]):
+    print(f"[INFO] Preserving existing custom Lua layer rules file: {files_out['layer_rules']}")
+elif layer_rules:
+    layer_lines.append("-- Converted from LayerRules.conf")
+    for rule_type, rule in layer_rules:
+        layer_lines.append(emit_rule(rule_type, rule))
+        layer_lines.append("")
+    write_file(files_out["layer_rules"], layer_lines)
+else:
+    if not files_out["layer_rules"].exists():
+        layer_lines.append("-- No active layer rules were found in LayerRules.conf.")
+        write_file(files_out["layer_rules"], layer_lines)
+    else:
+        print(f"[INFO] Keeping existing {files_out['layer_rules']}")
+
+keybind_lines = [
+    "-- User keybind overrides (auto-generated).",
+    "-- Add, override, or rebind keybinds with bind(\"MODS\", \"KEY\", fn, opts) and unbind(\"MODS\", \"KEY\").",
+    "--",
+    "-- 1. ADDING A NEW KEYBIND (combo not used by default):",
+    "--    bind(\"SUPER\", \"Z\", exec_cmd(\"ghostty\"), { description = \"Launch Ghostty\" })",
+    "--    bind(\"SUPER SHIFT\", \"V\", exec_cmd(\"pavucontrol\"), { description = \"Audio Control\" })",
+    "--",
+    "-- 2. OVERRIDING AN EXISTING COMBO WITH A DIFFERENT APP/COMMAND:",
+    "--    unbind(\"SUPER\", \"Return\")",
+    "--    bind(\"SUPER\", \"Return\", exec_cmd(\"ghostty\"), { description = \"Launch Ghostty\" })",
+    "--",
+    "-- 3. REBINDING AN ACTION TO A NEW KEY COMBINATION:",
+    "--    unbind(\"SUPER\", \"E\")",
+    "--    unbind(\"SUPER\", \"F\")",
+    "--    bind(\"SUPER\", \"F\", exec_cmd(\"$HOME/.config/hypr/scripts/LaunchFileManager.sh '$files' '$term'\"), { description = \"File manager\" })",
+    "--    bind(\"SUPER\", \"E\", exec_cmd(\"emacsclient -c -a 'emacs'\"), { description = \"Launch Emacs\" })",
+    "--",
+    "-- 4. REBINDING DISPATCHERS (e.g. killactive, workspace):",
+    "--    unbind(\"SUPER\", \"Q\")",
+    "--    bind(\"SUPER\", \"Q\", dispatch(\"killactive\"), { description = \"Close active window\" })",
+    "--",
+    "-- 5. BIND OPTIONS (locked, repeating):",
+    "--    bind(\"CTRL ALT\", \"bracketright\", exec_cmd(\"$HOME/.config/hypr/scripts/Brightness.sh --inc\"), { description = \"Brightness up\", repeating = true })",
+    "--    bind(\"\", \"XF86AudioMute\", exec_cmd(\"$HOME/.config/hypr/scripts/Volume.sh --toggle\"), { description = \"Mute audio\", locked = true })",
+    "--",
+    "-- Helper functions live in ${XDG_CONFIG_HOME:-$HOME/.config}/hypr/lua/user_keybinds_helper.lua so they can be updated separately.",
+    "local user_keybinds_helper = nil",
+    "do",
+    "  local source = (debug.getinfo(1, \"S\") or {}).source or \"\"",
+    "  local source_path = source:match(\"^@(.+)$\")",
+    "  local source_dir = source_path and source_path:match(\"^(.*)/[^/]+$\") or nil",
+    "  local home = os.getenv(\"HOME\") or \"\"",
+    "  local candidate_paths = {",
+    "    source_dir and (source_dir .. \"/../lua/user_keybinds_helper.lua\") or nil,",
+    "    home ~= \"\" and (home .. \"/.config/hypr/lua/user_keybinds_helper.lua\") or nil,",
+    "    home ~= \"\" and (home .. \"/.config/hypr/user_keybinds_helper.lua\") or nil,",
+    "  }",
+    "",
+    "  local tried_paths = {}",
+    "  for _, helper_path in ipairs(candidate_paths) do",
+    "    if helper_path then",
+    "      table.insert(tried_paths, helper_path)",
+    "      local f = io.open(helper_path, \"r\")",
+    "      if f then",
+    "        f:close()",
+    "        local loaded_ok, loaded_helpers = pcall(dofile, helper_path)",
+    "        if loaded_ok and type(loaded_helpers) == \"table\" and loaded_helpers.bind then",
+    "          user_keybinds_helper = loaded_helpers",
+    "          break",
+    "        end",
+    "      end",
+    "    end",
+    "  end",
+    "",
+    "  if not user_keybinds_helper then",
+    "    error(\"Failed to load user_keybinds_helper.lua from: \" .. table.concat(tried_paths, \", \"))",
+    "  end",
+    "end",
+    "local exec_cmd = user_keybinds_helper.exec_cmd",
+    "local dispatch = user_keybinds_helper.dispatch",
+    "local bind = user_keybinds_helper.bind",
+    "local unbind = user_keybinds_helper.unbind",
+    "",
+]
+if files_out["keybinds"].exists() and not lua_file_is_generated(files_out["keybinds"]):
+    print(f"[INFO] Preserving existing custom Lua keybinds file: {files_out['keybinds']}")
+elif keybinds:
+    keybind_lines.append("-- Converted from UserKeybinds.conf")
+    keybind_lines.extend(keybinds)
+    write_file(files_out["keybinds"], keybind_lines)
+else:
+    if not files_out["keybinds"].exists():
+        write_file(files_out["keybinds"], keybind_lines)
+    else:
+        print(f"[INFO] Keeping existing {files_out['keybinds']}")
+
+for name, source in [
+    ("settings", settings_path),
+    ("decorations", decorations_path),
+    ("animations", animations_path),
+    ("laptops", laptops_path),
+]:
+    if files_out[name].exists():
+        print(f"[INFO] Preserving existing custom Lua {name} file: {files_out[name]}")
+        continue
+    title = f"-- User {name} overrides (auto-generated)."
+    lines = [
+        title,
+        "-- This file is intentionally split from other user overrides.",
+        "-- Add only user-specific Lua overrides here.",
+        "-- Example:",
+        "-- hl.config({ general = { gaps_in = 4, gaps_out = 8 } })",
+        "",
+    ]
+    reference = source_examples(source)
+    if name == "decorations":
+        if reference or not files_out[name].exists():
+            parsed_decorations = parse_hyprlang_sections(source)
+            decoration_lines = [
+                title,
+                "-- This file is intentionally split from other user overrides.",
+                "-- Add only user-specific Lua overrides here.",
+                "-- Reads active border/shadow colors from wallust-hyprland.conf.",
+                "",
+                "local config_home = os.getenv(\"XDG_CONFIG_HOME\") or ((os.getenv(\"HOME\") or \"\") .. \"/.config\")",
+                "local wallust_colors_file = config_home .. \"/hypr/wallust/wallust-hyprland.conf\"",
+                "",
+                "local user_decorations_helper = nil",
+                "do",
+                "  local source = (debug.getinfo(1, \"S\") or {}).source or \"\"",
+                "  local source_path = source:match(\"^@(.+)$\")",
+                "  local source_dir = source_path and source_path:match(\"^(.*)/[^/]+$\") or nil",
+                "  local home = os.getenv(\"HOME\") or \"\"",
+                "  local candidate_paths = {",
+                "    source_dir and (source_dir .. \"/../lua/user_decorations_helper.lua\") or nil,",
+                "    home ~= \"\" and (home .. \"/.config/hypr/lua/user_decorations_helper.lua\") or nil,",
+                "    home ~= \"\" and (home .. \"/.config/hypr/user_decorations_helper.lua\") or nil,",
+                "  }",
+                "",
+                "  local tried_paths = {}",
+                "  for _, helper_path in ipairs(candidate_paths) do",
+                "    if helper_path then",
+                "      table.insert(tried_paths, helper_path)",
+                "      local f = io.open(helper_path, \"r\")",
+                "      if f then",
+                "        f:close()",
+                "        local loaded_ok, loaded_helpers = pcall(dofile, helper_path)",
+                "        if loaded_ok and type(loaded_helpers) == \"table\" and loaded_helpers.load_wallust_colors then",
+                "          user_decorations_helper = loaded_helpers",
+                "          break",
+                "        end",
+                "      end",
+                "    end",
+                "  end",
+                "",
+                "  if not user_decorations_helper then",
+                "    error(\"Failed to load user_decorations_helper.lua from: \" .. table.concat(tried_paths, \", \"))",
+                "  end",
+                "end",
+                "local load_wallust_colors = user_decorations_helper.load_wallust_colors",
+                "",
+                "local wallust = load_wallust_colors(wallust_colors_file)",
+                "local function wallust_color(name, fallback)",
+                "  local value = wallust[name]",
+                "  if value ~= nil then",
+                "    return value",
+                "  end",
+                "  return fallback",
+                "end",
+            ]
+            if parsed_decorations:
+                for section_name in ("general", "decoration", "group"):
+                    section = parsed_decorations.get(section_name)
+                    if not section:
+                        continue
+                    decoration_lines.append("")
+                    decoration_lines.append("hl.config({")
+                    decoration_lines.append(f"  {section_name} = {{")
+                    decoration_lines.extend(render_table(section, indent=4))
+                    decoration_lines.append("  },")
+                    decoration_lines.append("})")
+            else:
+                decoration_lines.extend([
+                    "",
+                    "hl.config({",
+                    "  general = {",
+                    "    border_size = 2,",
+                    "    gaps_in = 2,",
+                    "    gaps_out = 4,",
+                    "    col = {",
+                    "      active_border = wallust_color(\"color12\", \"rgba(8db4ffff)\"),",
+                    "      inactive_border = wallust_color(\"color10\", \"rgba(5f6578ff)\"),",
+                    "    },",
+                    "  },",
+                    "})",
+                    "",
+                    "hl.config({",
+                    "  decoration = {",
+                    "    rounding = 10,",
+                    "    active_opacity = 1.0,",
+                    "    inactive_opacity = 0.9,",
+                    "    fullscreen_opacity = 1.0,",
+                    "    dim_inactive = true,",
+                    "    dim_strength = 0.1,",
+                    "    dim_special = 0.8,",
+                    "    shadow = {",
+                    "      enabled = true,",
+                    "      range = 3,",
+                    "      render_power = 1,",
+                    "      color = wallust_color(\"color12\", \"rgba(8db4ffff)\"),",
+                    "      color_inactive = wallust_color(\"color10\", \"rgba(5f6578ff)\"),",
+                    "    },",
+                    "    blur = {",
+                    "      enabled = true,",
+                    "      size = 6,",
+                    "      passes = 3,",
+                    "      new_optimizations = true,",
+                    "      xray = true,",
+                    "      ignore_opacity = true,",
+                    "      special = true,",
+                    "      popups = true,",
+                    "    },",
+                    "  },",
+                    "})",
+                    "",
+                    "hl.config({",
+                    "  group = {",
+                    "    col = {",
+                    "      border_active = wallust_color(\"color15\", \"rgba(ffffffff)\"),",
+                    "    },",
+                    "    groupbar = {",
+                    "      col = {",
+                    "        active = wallust_color(\"color0\", \"rgba(0f111aff)\"),",
+                    "      },",
+                    "    },",
+                    "  },",
+                    "})",
+                ])
+            if reference:
+                decoration_lines.extend([
+                    "",
+                    f"-- Source reference from {source.name} (hyprlang):",
+                    *reference,
+                ])
+            write_file(files_out[name], decoration_lines)
+        else:
+            print(f"[INFO] No active entries found in {source}; keeping existing {files_out[name]}")
+        continue
+    if reference:
+        lines.extend([
+            f"-- Source reference from {source.name} (hyprlang):",
+            *reference,
+        ])
+        write_file(files_out[name], lines)
+    else:
+        if files_out[name].exists():
+            print(f"[INFO] No active entries found in {source}; keeping existing {files_out[name]}")
+        else:
+            lines.append(f"-- No active entries were found in {source.name}.")
+            write_file(files_out[name], lines)
+PY
+ensure_templates_for_empty_user_configs
+
+if [ -f "$SRC_HYPR_DIR/lua/user_overrides.lua" ]; then
+  cp -f "$SRC_HYPR_DIR/lua/user_overrides.lua" "$USER_OVERRIDES_SHIM"
+else
+  cat > "$USER_OVERRIDES_SHIM" <<'LUA'
+-- ==================================================
+--  KoolDots (2026)
+--  Project URL: https://github.com/LinuxBeginnings
+--  License: GNU GPLv3
+--  SPDX-License-Identifier: GPL-3.0-or-later
+-- ==================================================
+-- Auto-generated by scripts/migrate-hypr-to-lua.sh.
+-- Loads split system/user Lua files from ${XDG_CONFIG_HOME:-$HOME/.config}/hypr/configs and ${XDG_CONFIG_HOME:-$HOME/.config}/hypr/UserConfigs.
+local configHome = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")
+local hyprDir = configHome .. "/hypr"
+local systemDir = hyprDir .. "/configs"
+local userDir = configHome .. "/hypr/UserConfigs"
+
+local function qml_module_exists(subpath)
+  local candidate_roots = {
+    "/usr/lib/qt6/qml",
+    "/usr/lib64/qt6/qml",
+    "/usr/lib/x86_64-linux-gnu/qt6/qml",
+    "/usr/lib/aarch64-linux-gnu/qt6/qml",
+    "/usr/lib/qt5/qml",
+    "/usr/lib64/qt5/qml",
+    "/usr/lib/x86_64-linux-gnu/qt5/qml",
+    "/usr/lib/aarch64-linux-gnu/qt5/qml",
+    "/usr/lib/qt/qml",
+    "/usr/lib64/qt/qml",
+    "/usr/share/qt6/qml",
+    "/usr/share/qt5/qml",
+    "/usr/share/qml",
+  }
+  for _, root in ipairs(candidate_roots) do
+    local f = io.open(root .. "/" .. subpath, "r")
+    if f then
+      f:close()
+      return true
+    end
+  end
+  return false
+end
+
+local function has_kvantum_qml_module()
+  return qml_module_exists("kvantum") or qml_module_exists("org/kde/kvantum")
+end
+
+local function has_hyprland_qml_style_module()
+  return qml_module_exists("org/hyprland/style")
+end
+
+local function apply_qt_style_fallbacks()
+  if not hl or not hl.env then
+    return
+  end
+
+  if not has_kvantum_qml_module() then
+    local style_override = (os.getenv("QT_STYLE_OVERRIDE") or ""):lower()
+    if style_override == "kvantum" or style_override == "kvantum-dark" then
+      hl.env("QT_STYLE_OVERRIDE", "Fusion")
+    end
+  end
+  if not has_hyprland_qml_style_module() then
+    local quick_controls = (os.getenv("QT_QUICK_CONTROLS_STYLE") or ""):lower()
+    if quick_controls == "" or quick_controls == "org.hyprland.style" then
+      hl.env("QT_QUICK_CONTROLS_STYLE", "Basic")
+    end
+  end
+end
+
+local function load_optional(path)
+  local ok, err = pcall(dofile, path)
+  if ok then
+    return true
+  end
+  if err and tostring(err):find("No such file or directory", 1, true) == nil then
+    print("[WARN] Unable to load user override file " .. path .. ": " .. tostring(err))
+  end
+  return false
+end
+local loaded_user_split = false
+
+local system_files = {
+  "system_env.lua",
+  "system_startup.lua",
+  "system_window_rules.lua",
+  "system_layer_rules.lua",
+  "system_keybinds.lua",
+  "system_settings.lua",
+  "system_laptops.lua",
+}
+for _, file in ipairs(system_files) do
+  local primary = systemDir .. "/" .. file
+  local legacy = userDir .. "/" .. file
+  if not load_optional(primary) then
+    load_optional(legacy)
+  end
+end
+
+local user_files = {
+  "user_env.lua",
+  "user_startup.lua",
+  "user_window_rules.lua",
+  "user_layer_rules.lua",
+  "user_keybinds.lua",
+  "user_settings.lua",
+  "user_decorations.lua",
+  "user_animations.lua",
+  "user_laptops.lua",
+}
+for _, file in ipairs(user_files) do
+  local path = userDir .. "/" .. file
+  if load_optional(path) then
+    loaded_user_split = true
+  end
+end
+if not loaded_user_split then
+  load_optional(userDir .. "/user_overrides.lua") -- legacy single-file support
+end
+apply_qt_style_fallbacks()
+LUA
+fi
+
+USER_CONFIGS_CONVERTED_CONFS=(
+  "01-UserDefaults.conf"
+  "ENVariables.conf"
+  "LaptopDisplay.conf"
+  "Laptops.conf"
+  "LayerRules.conf"
+  "Startup_Apps.conf"
+  "UserAnimations.conf"
+  "UserDecorations.conf"
+  "UserKeybinds.conf"
+  "UserSettings.conf"
+  "WindowRules.conf"
+  "WorkSpaceRules.conf"
+)
+
+move_converted_user_confs_to_legacy() {
+  local source_dir="$1"
+  local legacy_dir="$2"
+  local moved=0
+  local conf_name src_file
+
+  [ -d "$source_dir" ] || return 0
+  mkdir -p "$legacy_dir"
+
+  for conf_name in "${USER_CONFIGS_CONVERTED_CONFS[@]}"; do
+    src_file="$source_dir/$conf_name"
+    if [ -f "$src_file" ]; then
+      mv "$src_file" "$legacy_dir/"
+      moved=1
+    fi
+  done
+
+  if [ "$moved" -eq 1 ]; then
+    echo "[OK] Moved UserConfigs converted *.conf -> $legacy_dir"
+  fi
+}
+
+move_conf_files_to_legacy() {
+  local source_dir="$1"
+  local legacy_dir="$2"
+  local label="$3"
+  shift 3
+  local -a preserved_confs=("$@")
+  local moved=0
+  local file
+  local basename
+  local keep
+  local preserved
+
+  [ -d "$source_dir" ] || return 0
+  mkdir -p "$legacy_dir"
+
+  while IFS= read -r -d '' file; do
+    basename="$(basename "$file")"
+    keep=0
+    for preserved in "${preserved_confs[@]}"; do
+      if [ "$basename" = "$preserved" ]; then
+        keep=1
+        break
+      fi
+    done
+    [ "$keep" -eq 1 ] && continue
+    mv "$file" "$legacy_dir/"
+    moved=1
+  done < <(find "$source_dir" -maxdepth 1 -type f -name '*.conf' -print0)
+
+  if [ "$moved" -eq 1 ]; then
+    echo "[OK] Moved $label/*.conf -> $legacy_dir"
+  fi
+}
+move_root_confs_to_legacy() {
+  local root_dir="$1"
+  local legacy_dir="$2"
+  local moved=0
+  local conf_file
+
+  [ -d "$root_dir" ] || return 0
+  mkdir -p "$legacy_dir"
+
+  for conf_file in hyprland.conf monitors.conf workspaces.conf; do
+    if [ -f "$root_dir/$conf_file" ]; then
+      mv "$root_dir/$conf_file" "$legacy_dir/"
+      moved=1
+    fi
+  done
+
+  if [ "$moved" -eq 1 ]; then
+    echo "[OK] Moved root legacy *.conf (hyprland.conf, monitors.conf, workspaces.conf) -> $legacy_dir"
+  fi
+}
+
+print_conversion_coverage_summary() {
+  echo "[INFO] Migration coverage summary (Hyprland Lua mode):"
+  cat <<SUMMARY
+[INFO]   Converted .conf -> .lua:
+    - $DEST_HYPR_DIR/hyprland.conf -> $DEST_LUA_ENTRY
+    - $DEST_MONITORS_CONF -> $DEST_LUA_MONITORS
+    - $DEST_WORKSPACES_CONF -> $DEST_LUA_WORKSPACES
+    - $SYSTEM_ENV_VARS -> $CONFIGS_DIR/system_env.lua
+    - $SYSTEM_STARTUP_APPS -> $CONFIGS_DIR/system_startup.lua
+    - $SYSTEM_WINDOW_RULES -> $CONFIGS_DIR/system_window_rules.lua
+    - $SYSTEM_LAYER_RULES -> $CONFIGS_DIR/system_layer_rules.lua
+    - $SYSTEM_KEYBINDS -> $CONFIGS_DIR/system_keybinds.lua
+    - $SYSTEM_SETTINGS -> $CONFIGS_DIR/system_settings.lua
+    - $SYSTEM_LAPTOPS -> $CONFIGS_DIR/system_laptops.lua
+    - $USER_ENV_VARS -> $USER_CONFIGS_DIR/user_env.lua
+    - $USER_STARTUP_APPS -> $USER_CONFIGS_DIR/user_startup.lua
+    - $USER_WINDOW_RULES -> $USER_CONFIGS_DIR/user_window_rules.lua
+    - $USER_LAYER_RULES -> $USER_CONFIGS_DIR/user_layer_rules.lua
+    - $USER_KEYBINDS -> $USER_CONFIGS_DIR/user_keybinds.lua
+    - $USER_SETTINGS -> $USER_CONFIGS_DIR/user_settings.lua
+    - $USER_DECORATIONS -> $USER_CONFIGS_DIR/user_decorations.lua
+    - $USER_ANIMATIONS -> $USER_CONFIGS_DIR/user_animations.lua
+    - $USER_LAPTOPS -> $USER_CONFIGS_DIR/user_laptops.lua
+    - $USER_CONFIGS_DIR/01-UserDefaults.conf -> $USER_CONFIGS_DIR/user_defaults.lua
+    - $USER_CONFIGS_DIR/LaptopDisplay.conf -> $USER_CONFIGS_DIR/user_laptops.lua
+    - $USER_CONFIGS_DIR/WorkSpaceRules.conf -> $USER_CONFIGS_DIR/workspaces.lua
+[INFO]   Preserved native non-Hyprland / standalone .conf files:
+    - $DEST_HYPR_DIR/hypridle.conf
+    - $DEST_HYPR_DIR/hyprlock.conf, hyprlock-1080p.conf, hyprlock-2k.conf
+    - $DEST_HYPR_DIR/application-style.conf
+    - $USER_CONFIGS_DIR/kitty.conf, $USER_CONFIGS_DIR/ghostty.conf, $USER_CONFIGS_DIR/hyprview-layout.conf
+SUMMARY
+}
+
+if [ -f "$DEST_HYPR_DIR/hypridle.conf" ]; then
+  sed -i "s|hyprctl dispatch dpms off|hyprctl dispatch hl.dsp.dpms '{ action = \"off\" }'|g" "$DEST_HYPR_DIR/hypridle.conf"
+  sed -i "s|hyprctl dispatch dpms on|hyprctl dispatch hl.dsp.dpms '{ action = \"on\" }'|g" "$DEST_HYPR_DIR/hypridle.conf"
+fi
+
+move_converted_user_confs_to_legacy "$USER_CONFIGS_DIR" "$USER_CONFIGS_LEGACY_DIR"
+move_conf_files_to_legacy "$CONFIGS_DIR" "$CONFIGS_LEGACY_DIR" "$CONFIGS_DIR"
+move_root_confs_to_legacy "$DEST_HYPR_DIR" "$DEST_HYPR_DIR/$LEGACY_CONFIGS_DIR_NAME/$MIGRATION_TS"
+print_conversion_coverage_summary
+
+echo "[OK] Lua Hyprland config copied."
+echo "[INFO] Restart Hyprland to test Lua config pickup."
+echo "[INFO] To rollback: $(basename "$0") --revert"
