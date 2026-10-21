@@ -92,6 +92,7 @@ installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout p
 - Dolphin = default file manager. Default apps: Ark (archives), Gwenview (images), Okular (pdf/epub), Kate (text).
 - Dialogs: `~/.config/xdg-desktop-portal/hyprland-portals.conf` sends FileChooser, AppChooser, Print and Settings to the KDE portal; `GTK_USE_PORTAL=1` makes GTK apps use it. Screen sharing stays on the Hyprland portal.
 - Browsers: Firefox gets `widget.use-xdg-desktop-portal.*` prefs (system default + existing profiles' `user.js`); Chromium-based browsers follow `GTK_USE_PORTAL=1`.
+- Thumbnails: kio-extras, kdegraphics-thumbnailers (pdf/ps/raw), ffmpegthumbs (video), kimageformats + qt6-imageformats (avif/heif/jxl/webp/exr...), taglib (audio covers). Thunar option: tumbler, ffmpegthumbnailer, poppler-glib, libgsf, libopenraw, webp/heif/jxl loaders, epub.
 - Integration: `qt6-wayland`, `udisks2` (Dolphin devices), `archlinux-xdg-menu` + `XDG_MENU_PREFIX=arch-` + `kbuildsycoca6` ("Open with" menu), D-Bus activation env set at session start.
 - Services: `kded6` (started with the session), `kglobalacceld` (global shortcuts, D-Bus activated). KDE app notifications go to the running daemon (swaync); KDE's own notification daemon is part of plasma-workspace and is not installed.
 - Env lives in `UserConfigs/user_env.lua` and startup in `UserConfigs/user_startup.lua` (marker `hypr-w89 kde`).

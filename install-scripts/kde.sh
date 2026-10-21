@@ -22,6 +22,14 @@ kde=(
   kde-cli-tools
   kdegraphics-thumbnailers
   ffmpegthumbs
+  kimageformats
+  qt6-imageformats
+  taglib
+  libavif
+  libheif
+  libjxl
+  libraw
+  openexr
   gwenview
   okular
   kate
@@ -122,6 +130,9 @@ fi
 if pacman -Qq gnome-keyring >/dev/null 2>&1; then
   echo "${WARN} gnome-keyring is installed and competes with KWallet for org.freedesktop.secrets. Not removed." | tee -a "$LOG"
 fi
+
+# Retry thumbnails that failed before the thumbnailers were installed
+rm -rf "$HOME/.cache/thumbnails/fail"
 
 echo "${NOTE} Qt env + colours are applied by hypr_theme.sh (runs after the dots)." | tee -a "$LOG"
 printf "\n%.0s" {1..2}

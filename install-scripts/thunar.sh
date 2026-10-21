@@ -13,6 +13,13 @@ thunar=(
   thunar-volman 
   tumbler
   ffmpegthumbnailer 
+  poppler-glib
+  libgsf
+  libopenraw
+  webp-pixbuf-loader
+  libheif
+  libjxl
+  gnome-epub-thumbnailer
   thunar-archive-plugin
   xarchiver
 )
@@ -39,6 +46,9 @@ printf "${INFO} Installing ${SKY_BLUE}Thunar${RESET} Packages...\n"
   for THUNAR in "${thunar[@]}"; do
     install_package "$THUNAR" "$LOG"
   done
+
+# Retry thumbnails that failed before the thumbnailers were installed
+rm -rf "$HOME/.cache/thumbnails/fail"
 
 printf "\n%.0s" {1..1}
 
