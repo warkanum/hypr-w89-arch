@@ -15,6 +15,7 @@ Interactive (whiptail) when run without arguments; otherwise `./theme.sh --schem
 | `--kde` | KDE/Qt colour scheme into `kdeglobals` (+ `~/.local/share/color-schemes`) |
 | `--sddm` | SDDM theme via `sddm-theme.sh set --scheme` (sudo) |
 | `--hypr` | Hyprland, waybar, rofi via `hypr-theme` (needs the dots) |
+| `--wallpapers [DIR]` | Copy bundled wallpapers (default `~/Pictures/wallpapers`, existing files kept) |
 | `--all` / `--list` | Every target / list schemes |
 
 Only the block between `hypr-w89 theme begin/end` in the gtk.css files is rewritten; other content is kept.
