@@ -47,7 +47,12 @@ fi
 
 # Create Directory for Install Logs
 if [ ! -d Install-Logs ]; then
-  mkdir Install-Logs
+  mkdir Install-Logs 2>/dev/null || { sudo mkdir Install-Logs && sudo chown "$(id -un):$(id -gn)" Install-Logs; }
+fi
+# A previous run as root (or a root-owned checkout) leaves the directory unwritable
+if [ ! -w Install-Logs ]; then
+  echo "Install-Logs is not writable, fixing ownership..."
+  sudo chown -R "$(id -un):$(id -gn)" Install-Logs
 fi
 
 # Set the name of the log file to include the current date and time
