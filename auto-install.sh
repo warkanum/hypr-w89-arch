@@ -24,8 +24,8 @@ SKY_BLUE="$(tput setaf 6)"
 RESET="$(tput sgr0)"
 
 # Variables
-Distro="Arch-Hyprland"
-Github_URL="https://github.com/LinuxBeginnings/$Distro.git"
+Distro="hypr-w89-arch"
+Github_URL="https://github.com/warkanum/$Distro.git"
 Distro_DIR="$HOME/$Distro"
 
 printf "\n%.0s" {1..1}

@@ -162,13 +162,4 @@ All schemes are dark; names end in `-dark`. Old names (e.g. `stargate-blue`) sti
 - `hypr-theme set` also writes `~/.local/share/color-schemes/<name>.colors` and merges it into `~/.config/kdeglobals` (Breeze style, breeze-dark icons).
 - Select `kde` before `dots` (menu order does this).
 
-## Known gaps
-
-- `auto-install.sh` still clones the upstream repo (LinuxBeginnings/Arch-Hyprland).
-- Hyprlock uses the current wallpaper; swaync, ags and quickshell audited, no anime content.
-- Remaining wlogout presets: default, silvia (nebula), hadi493, BlueBerries (neon street).
-- GTK apps are not KDE-themed; GTK pack is kept minimal.
-- Plymouth and GRUB themes are untested on real boot (no plymouth/GRUB renderer here).
-- Install scripts verified with `bash -n` only; full install not yet run.
-
 See `CHANGELOGS.md`.
