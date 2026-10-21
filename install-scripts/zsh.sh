@@ -115,4 +115,9 @@ if [ -d "$HOME/.oh-my-zsh/themes" ]; then
     cp -r assets/add_zsh_theme/* ~/.oh-my-zsh/themes >> "$LOG" 2>&1
 fi
 
+# Default prompt colours from the default scheme
+if command -v python3 >/dev/null 2>&1; then
+    python3 -I assets/hypr-themes/apply-targets.py zsh assets/hypr-themes/stargate-carbon-dark.json stargate-carbon-dark >> "$LOG" 2>&1
+fi
+
 printf "\n%.0s" {1..2}

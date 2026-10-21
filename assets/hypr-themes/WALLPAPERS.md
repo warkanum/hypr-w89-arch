@@ -34,7 +34,7 @@ close-up specified fictional pictograms rather than readable lettering. LCARS
 panels used abstract shapes without labels, digits, icons, or desktop/app chrome;
 the first LCARS image keeps its centre empty and its bars near the edges.
 
-Still missing: `starfleet-1.png` and `starfleet-2.png`. The image tool rejected
+Missing after the initial run: `starfleet-1.png` and `starfleet-2.png`. The image tool rejected
 both scenes at output moderation, including retries using the original prompts.
 No placeholder files were added.
 
@@ -59,3 +59,22 @@ Same size and constraints as above. The `starfleet-*` prompts were rejected by t
 
 Save as the file names above; they are picked up by `theme.sh --wallpapers` and `sddm-theme.sh --wallpapers`.
 
+## Follow-up generation status (2026-10-21)
+
+Checked the destination first and skipped all 14 existing wallpapers without
+modifying them. Generated 13 missing wallpapers with the built-in imagegen tool:
+`starfleet-2.png`, `starfleet-3.png`, `starfleet-4.png`, `starfleet-5.png`,
+`lcars-3.png`, `lcars-4.png`, `vulcan-1.png`, `klingon-1.png`, `romulan-1.png`,
+`borg-1.png`, `section31-1.png`, `warp-1.png`, and `station-1.png`.
+
+The prompt set was the corresponding table rows above. The twelve newer prompts
+were used verbatim, followed by the shared constraints and a request for a single
+wide 2560×1440 PNG desktop wallpaper. The original `starfleet-1` and `starfleet-2`
+prompts also specified cinematic realistic science-fiction styling.
+
+Saved all 13 successful outputs in `wallpapers/` as PNGs at 2560×1440, using
+ImageMagick to resize to cover and centre-crop the 1672×941 originals.
+
+Still missing: `starfleet-1.png`. Its original scene was attempted again, but the
+image tool rejected the generated output (`moderation_blocked`, category `other`).
+No placeholder was added. `starfleet-2.png` succeeded on this run.

@@ -17,6 +17,7 @@
   - Standalone `sddm-theme.sh` (set/test/remove/status) with `--scheme`, `--background`, `--kitty`, `--wallpapers`
   - `theme.sh`: choose scheme and targets (kitty, GTK, KDE, SDDM, Hyprland, wallpapers); `HYPR_THEME_NO_KDE` lets `hypr-theme` skip KDE colours
   - Schemes renamed with a `-dark` suffix (old names still resolve); new dark Stargate variants: `stargate-oled-dark`, `stargate-gunmetal-dark`, `stargate-midnight-dark`, `atlantis-abyss-dark`
+  - zsh prompt themes `stargate`, `lcars`, `stargate-minimal` (default `stargate`) and `theme.sh --zsh` for scheme-driven prompt/highlight colours
   - SDDM preview keys: `Ctrl+Shift+O` (open gate/splash), `Ctrl+Shift+F` (failed dial).
 
 ## Oct 2026

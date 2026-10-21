@@ -13,10 +13,13 @@ Interactive (whiptail) when run without arguments; otherwise `./theme.sh --schem
 | `--kitty` | Kitty theme from the scheme, selected in kitty.conf |
 | `--gtk` | `@define-color` block in `gtk-3.0/gtk.css` + `gtk-4.0/gtk.css`, dark preference. Full effect on GTK4/libadwaita; GTK3 only for themes that use the named colours |
 | `--kde` | KDE/Qt colour scheme into `kdeglobals` (+ `~/.local/share/color-schemes`) |
+| `--zsh [THEME]` | Writes `~/.config/hypr-w89/zsh-colors.zsh` (prompt, autosuggestion and syntax-highlight colours); `THEME` = `stargate`, `lcars` or `stargate-minimal` sets `ZSH_THEME` in `~/.zshrc` |
 | `--sddm` | SDDM theme via `sddm-theme.sh set --scheme` (sudo) |
 | `--hypr` | Hyprland, waybar, rofi via `hypr-theme` (needs the dots) |
 | `--wallpapers [DIR]` | Copy bundled wallpapers (default `~/Pictures/wallpapers`, existing files kept) |
 | `--all` / `--list` | Every target / list schemes |
+
+zsh themes live in `assets/add_zsh_theme` (copied to `~/.oh-my-zsh/themes` by the zsh option; default `stargate`). They use truecolor hex and fall back to built-in Stargate colours without the colours file. The upstream themes stay installed.
 
 Only the block between `hypr-w89 theme begin/end` in the gtk.css files is rewritten; other content is kept.
 

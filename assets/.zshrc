@@ -3,7 +3,11 @@
 
 export ZSH="$HOME/.oh-my-zsh"
 
-ZSH_THEME="agnosterzak"
+# Stargate themes: stargate, lcars, stargate-minimal (colours: theme.sh --zsh)
+ZSH_THEME="stargate"
+
+# Scheme colours for the prompt, autosuggestions and syntax highlighting
+[ -f "$HOME/.config/hypr-w89/zsh-colors.zsh" ] && source "$HOME/.config/hypr-w89/zsh-colors.zsh"
 
 plugins=(
     git

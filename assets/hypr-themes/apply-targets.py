@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Apply a colour scheme (assets/hypr-themes/<name>.json) to one target.
 
-Usage: apply-targets.py <kitty|gtk|kde> <scheme.json> <name>
+Usage: apply-targets.py <kitty|gtk|kde|zsh> <scheme.json> <name>
 """
 import json
 import os
@@ -87,9 +87,50 @@ def gtk():
         pass
 
 
+def zsh():
+    def mix(a, b, t):
+        a, b = a.lstrip("#"), b.lstrip("#")
+        return "#" + "".join("%02x" % round(int(a[i:i + 2], 16) * (1 - t) + int(b[i:i + 2], 16) * t) for i in (0, 2, 4))
+
+    bg, fg, accent = s["background"], s["foreground"], s["cursor"]
+    v = {
+        "HW_BG": bg, "HW_FG": fg, "HW_ACCENT": accent, "HW_DIM": mix(fg, bg, 0.5),
+        "HW_PATH": c["color4"], "HW_ERR": "#da4453",
+        "HW_SEG1": accent, "HW_SEG2": c["color5"], "HW_SEG3": c["color4"],
+    }
+    lines = [f"# zsh colours from scheme {name} (theme.sh --zsh)"]
+    lines += [f"export {k}='{val}'" for k, val in v.items()]
+    lines += [
+        f"export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg={v['HW_DIM']}'",
+        "typeset -gA ZSH_HIGHLIGHT_STYLES",
+        f"ZSH_HIGHLIGHT_STYLES[command]='fg={c['color6']}'",
+        f"ZSH_HIGHLIGHT_STYLES[builtin]='fg={c['color6']}'",
+        f"ZSH_HIGHLIGHT_STYLES[alias]='fg={c['color6']}'",
+        f"ZSH_HIGHLIGHT_STYLES[function]='fg={c['color6']}'",
+        f"ZSH_HIGHLIGHT_STYLES[path]='fg={fg},underline'",
+        f"ZSH_HIGHLIGHT_STYLES[single-quoted-argument]='fg={c['color3']}'",
+        f"ZSH_HIGHLIGHT_STYLES[double-quoted-argument]='fg={c['color3']}'",
+        f"ZSH_HIGHLIGHT_STYLES[comment]='fg={v['HW_DIM']}'",
+        "ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=#da4453'",
+    ]
+    out = f"{home}/.config/hypr-w89/zsh-colors.zsh"
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    open(out, "w").write("\n".join(lines) + "\n")
+    print(f"zsh: {out}")
+    theme = os.environ.get("HW_ZSH_THEME")
+    zrc = f"{home}/.zshrc"
+    if theme and os.path.isfile(zrc):
+        text = open(zrc).read()
+        new, n = re.subn(r'^ZSH_THEME=.*$', f'ZSH_THEME="{theme}"', text, count=1, flags=re.M)
+        if n:
+            open(zrc, "w").write(new)
+            print(f"zsh: ZSH_THEME={theme} in {zrc}")
+    print("zsh: open a new shell (or `exec zsh`) to see it")
+
+
 def kde():
     subprocess.run([sys.executable, "-I", f"{here}/kde-colors.py", path, name], check=True)
     print(f"kde: color scheme {name} written to kdeglobals")
 
 
-{"kitty": kitty, "gtk": gtk, "kde": kde}[target]()
+{"kitty": kitty, "gtk": gtk, "kde": kde, "zsh": zsh}[target]()
