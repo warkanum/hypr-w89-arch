@@ -42,6 +42,23 @@ Other options (sddm, zsh, bluetooth, thunar, nvidia, rog, ags, quickshell) are u
 
 Keys are visual only; they never log in.
 
+Standalone script (no `install.sh`): `./sddm-theme.sh <command> [options]`
+
+| Command | Does |
+|---|---|
+| `set` | Install + activate (default) |
+| `test` | Preview window, installs nothing |
+| `remove` | Delete theme, restore config |
+| `status` / `schemes` / `backgrounds` | Show active theme / list schemes / list backgrounds |
+
+| Option | Does |
+|---|---|
+| `--scheme NAME` | SDDM accent + gate colour from a palette |
+| `--background NAME\|FILE` | Background image (bundled or path) |
+| `--kitty` | Write + select a kitty theme from `--scheme` (default `stargate-carbon`) |
+| `--wallpapers [DIR]` | Copy bundled wallpapers (default `~/Pictures/wallpapers`, existing files kept) |
+| `--theme-dir DIR` | Theme source |
+
 ## Hyprland theme (`assets/hypr-themes`)
 
 Runs after the dots (`install-scripts/hypr_theme.sh`):

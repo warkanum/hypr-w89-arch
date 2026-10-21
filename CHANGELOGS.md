@@ -14,6 +14,7 @@
   - KDE integration: KDE portal for file/app/print/settings dialogs, default KDE apps per mime type, qt6-wayland, udisks2, XDG menu cache, D-Bus activation env, kded6, kglobalacceld, Firefox/Chromium dialogs via KDE portal
   - `gtk-engine-murrine` is now the opt-in `gtk_murrine` option (AUR, builds gtk2 from source)
   - Thumbnail support for Dolphin (kio-extras, ffmpegthumbs, kimageformats, ...) and Thunar (tumbler plugins)
+  - Standalone `sddm-theme.sh` (set/test/remove/status) with `--scheme`, `--background`, `--kitty`, `--wallpapers`
   - SDDM preview keys: `Ctrl+Shift+O` (open gate/splash), `Ctrl+Shift+F` (failed dial).
 
 ## Oct 2026
