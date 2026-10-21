@@ -15,6 +15,7 @@
   - `gtk-engine-murrine` is now the opt-in `gtk_murrine` option (AUR, builds gtk2 from source)
   - Thumbnail support for Dolphin (kio-extras, ffmpegthumbs, kimageformats, ...) and Thunar (tumbler plugins)
   - Standalone `sddm-theme.sh` (set/test/remove/status) with `--scheme`, `--background`, `--kitty`, `--wallpapers`
+  - `theme.sh`: choose scheme and targets (kitty, GTK, KDE, SDDM, Hyprland); `HYPR_THEME_NO_KDE` lets `hypr-theme` skip KDE colours
   - SDDM preview keys: `Ctrl+Shift+O` (open gate/splash), `Ctrl+Shift+F` (failed dial).
 
 ## Oct 2026

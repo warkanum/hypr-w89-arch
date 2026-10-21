@@ -25,7 +25,7 @@ case "$1" in
     . "$cfg/hypr/scripts/WallustConfig.sh" 2>/dev/null && wallust_prepare_args
     wallust "${wallust_args[@]}" cs "$name" -q || exit 1
     # KDE/Qt colours (only when KDE apps are installed)
-    if command -v dolphin >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    if [ -z "$HYPR_THEME_NO_KDE" ] && command -v dolphin >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
       python3 -I "$share/kde-colors.py" "$share/$name.json" "$name"
     fi
     for s in Refresh.sh; do

@@ -4,6 +4,21 @@ Stargate / Star Trek themed Arch Linux Hyprland installer.
 
 **Credit:** fork of [LinuxBeginnings/Arch-Hyprland](https://github.com/LinuxBeginnings/Arch-Hyprland) (KooL's Arch-Hyprland). Licence GPL-3.0 (`LICENSE.md`).
 
+## Pick where a scheme goes: `./theme.sh`
+
+Interactive (whiptail) when run without arguments; otherwise `./theme.sh --scheme NAME [targets]`.
+
+| Target | Does |
+|---|---|
+| `--kitty` | Kitty theme from the scheme, selected in kitty.conf |
+| `--gtk` | `@define-color` block in `gtk-3.0/gtk.css` + `gtk-4.0/gtk.css`, dark preference. Full effect on GTK4/libadwaita; GTK3 only for themes that use the named colours |
+| `--kde` | KDE/Qt colour scheme into `kdeglobals` (+ `~/.local/share/color-schemes`) |
+| `--sddm` | SDDM theme via `sddm-theme.sh set --scheme` (sudo) |
+| `--hypr` | Hyprland, waybar, rofi via `hypr-theme` (needs the dots) |
+| `--all` / `--list` | Every target / list schemes |
+
+Only the block between `hypr-w89 theme begin/end` in the gtk.css files is rewritten; other content is kept.
+
 ## SDDM theme only: `./sddm-theme.sh` (no `install.sh`)
 
 `./sddm-theme.sh <command> [options]`
