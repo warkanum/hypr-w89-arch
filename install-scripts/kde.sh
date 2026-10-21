@@ -87,6 +87,25 @@ org.freedesktop.impl.portal.Settings=kde;gtk
 PORTALS
 echo "${OK} Portal config written to $portals" | tee -a "$LOG"
 
+# Browsers: send their file/open dialogs to the KDE portal
+firefox_prefs='pref("widget.use-xdg-desktop-portal.file-picker", 1);
+pref("widget.use-xdg-desktop-portal.mime-handler", 1);
+pref("widget.use-xdg-desktop-portal.open-uri", 1);
+pref("widget.use-xdg-desktop-portal.settings", 1);'
+if [ -d /usr/lib/firefox/browser/defaults/preferences ]; then
+  echo "$firefox_prefs" | sudo tee /usr/lib/firefox/browser/defaults/preferences/hypr-w89-kde-portal.js >/dev/null
+  echo "${OK} Firefox default prefs set (portal dialogs)." | tee -a "$LOG"
+fi
+# Existing Firefox profiles: user.js wins over defaults
+for prof in "$HOME"/.mozilla/firefox/*.default*/; do
+  [ -d "$prof" ] || continue
+  if ! grep -q 'widget.use-xdg-desktop-portal.file-picker' "$prof/user.js" 2>/dev/null; then
+    echo "${firefox_prefs//pref(/user_pref(}" >> "$prof/user.js"
+    echo "${OK} Firefox profile updated: $prof" | tee -a "$LOG"
+  fi
+done
+# Chromium-based browsers use the portal through GTK_USE_PORTAL=1 (set in user_env.lua by hypr_theme.sh).
+
 # Application menu cache so "Open with" lists apps outside Plasma
 XDG_MENU_PREFIX=arch- kbuildsycoca6 >/dev/null 2>&1 && echo "${OK} KDE service cache built." | tee -a "$LOG"
 

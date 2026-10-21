@@ -91,6 +91,7 @@ installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout p
 - Installs dolphin, ark, kio-extras, gwenview, okular, kate, breeze, plasma-integration, xdg-desktop-portal-kde.
 - Dolphin = default file manager. Default apps: Ark (archives), Gwenview (images), Okular (pdf/epub), Kate (text).
 - Dialogs: `~/.config/xdg-desktop-portal/hyprland-portals.conf` sends FileChooser, AppChooser, Print and Settings to the KDE portal; `GTK_USE_PORTAL=1` makes GTK apps use it. Screen sharing stays on the Hyprland portal.
+- Browsers: Firefox gets `widget.use-xdg-desktop-portal.*` prefs (system default + existing profiles' `user.js`); Chromium-based browsers follow `GTK_USE_PORTAL=1`.
 - Integration: `qt6-wayland`, `udisks2` (Dolphin devices), `archlinux-xdg-menu` + `XDG_MENU_PREFIX=arch-` + `kbuildsycoca6` ("Open with" menu), D-Bus activation env set at session start.
 - Env lives in `UserConfigs/user_env.lua` and startup in `UserConfigs/user_startup.lua` (marker `hypr-w89 kde`).
 - After the dots: `QT_QPA_PLATFORMTHEME=kde`, Fusion override removed, `files = dolphin`.
@@ -102,7 +103,7 @@ installs schemes + `hypr-theme`, removes stock wallpapers and Japanese wlogout p
 - `auto-install.sh` still clones the upstream repo (LinuxBeginnings/Arch-Hyprland).
 - Hyprlock uses the current wallpaper; swaync, ags and quickshell audited, no anime content.
 - Remaining wlogout presets: default, silvia (nebula), hadi493, BlueBerries (neon street).
-- GTK apps (browsers etc.) are not KDE-themed; GTK pack is kept minimal.
+- GTK apps are not KDE-themed; GTK pack is kept minimal.
 - Plymouth and GRUB themes are untested on real boot (no plymouth/GRUB renderer here).
 - Install scripts verified with `bash -n` only; full install not yet run.
 
