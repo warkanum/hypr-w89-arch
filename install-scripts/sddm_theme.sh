@@ -81,18 +81,18 @@ if [ -d "$theme_src" ]; then
     echo "Added [Theme] section with Current=$theme_name in $sddm_conf" | tee -a "$LOG"
   fi
 
-  # Add [General] section with InputMethod=qtvirtualkeyboard if it doesn't exist
+  # Add [General] section with empty InputMethod (no on-screen keyboard) if it doesn't exist
   if ! grep -q '^\[General\]' "$sddm_conf"; then
-    echo -e "\n[General]\nInputMethod=qtvirtualkeyboard" | sudo tee -a "$sddm_conf" > /dev/null
-    echo "Added [General] section with InputMethod=qtvirtualkeyboard in $sddm_conf" | tee -a "$LOG"
+    echo -e "\n[General]\nInputMethod=" | sudo tee -a "$sddm_conf" > /dev/null
+    echo "Added [General] section with InputMethod= in $sddm_conf" | tee -a "$LOG"
   else
     # Update InputMethod line if section exists
     if grep -q '^\s*InputMethod=' "$sddm_conf"; then
-      sudo sed -i '/^\[General\]/,/^\[/{s/^\s*InputMethod=.*/InputMethod=qtvirtualkeyboard/}' "$sddm_conf" 2>&1 | tee -a "$LOG"
-      echo "Updated InputMethod to qtvirtualkeyboard in $sddm_conf" | tee -a "$LOG"
+      sudo sed -i '/^\[General\]/,/^\[/{s/^\s*InputMethod=.*/InputMethod=/}' "$sddm_conf" 2>&1 | tee -a "$LOG"
+      echo "Updated InputMethod to empty in $sddm_conf" | tee -a "$LOG"
     else
-      sudo sed -i '/^\[General\]/a InputMethod=qtvirtualkeyboard' "$sddm_conf" 2>&1 | tee -a "$LOG"
-      echo "Appended InputMethod=qtvirtualkeyboard under [General] in $sddm_conf" | tee -a "$LOG"
+      sudo sed -i '/^\[General\]/a InputMethod=' "$sddm_conf" 2>&1 | tee -a "$LOG"
+      echo "Appended InputMethod= under [General] in $sddm_conf" | tee -a "$LOG"
     fi
   fi
 
