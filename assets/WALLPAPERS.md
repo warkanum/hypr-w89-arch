@@ -1,5 +1,44 @@
 # Wallpaper prompts
 
+Script-inspired Stargate scenes: [seven new prompts with transcript sources](STARGATE-SCENE-PROMPTS.md).
+
+Second set: [seven more scene prompts and generation notes](STARGATE-SCENE-PROMPTS-02.md).
+
+## Second script-inspired generation (2026-11-04)
+
+Generated with the built-in imagegen tool; saved in `assets/wallpapers/` as
+2560×1440 PNGs. ImageMagick resized the 1672×941 originals to cover and
+centre-cropped. Existing images were preserved; prompts and sources are linked above.
+
+| File | Scene |
+|---|---|
+| `stargate-crystal-skull-abyss.png` | Narrow bridge over a vast alien chamber |
+| `stargate-tokra-grown-crystal-tunnels.png` | Amber crystalline refuge underground |
+| `stargate-othala-quiet-arrival.png` | Imagined Asgard arrival hall on Othala |
+| `stargate-atlantis-lightning-pier.png` | Ocean storm striking an Atlantis lightning rod |
+| `stargate-atlantis-buried-tower.png` | Ancient spire above a buried city |
+| `stargate-universe-cloverdale-blue-growth.png` | Blue alien growth spreading through a forest |
+| `stargate-universe-resurgence-wreck-field.png` | A machine awakening among dead spacecraft |
+
+## Script-inspired generation (2026-11-04)
+
+Generated seven additional wallpapers with the built-in imagegen tool, saved in
+`assets/wallpapers/` as 2560×1440 PNGs. ImageMagick resized the 1672×941 originals
+to cover and centre-cropped. Existing assets were preserved.
+
+| File | Scene |
+|---|---|
+| `stargate-heliopolis-last-conversation.png` | Storm-lit meeting chamber and atomic holograms |
+| `stargate-nox-city-reveal.png` | Floating city above a misty forest |
+| `stargate-solitudes-buried-gate.png` | Dormant Antarctic gate and DHD in glacial ice |
+| `stargate-nemesis-replicator-corridor.png` | Block-built Replicators consuming an Asgard corridor |
+| `stargate-jumper-abyssal-silence.png` | Damaged Puddle Jumper sinking into dark water |
+| `stargate-universe-air-living-sand.png` | Sand vortex, water and a desert gate at blue hour |
+| `stargate-universe-faith-obelisk.png` | Caldera obelisk emitting a narrow white beacon |
+
+The linked scene document contains the exact prompt set, shared brief, transcript
+sources and creative departures. These files use the existing wallpaper installer.
+
 Original login backgrounds, now shared in `assets/wallpapers/`: ancient-outpost-aurora, atlantis-jumper-patrol, atlantis-ocean-ascent, jumper-asteroid-expedition, pegasus-orbital-gate, stargate-space, wraith-hive-recon. All Stargate/Atlantis; the prompts below fill the Star Trek and dark-grey gaps.
 
 Generate, then save into `assets/wallpapers/` (copied to `~/Pictures/wallpapers` on install).

@@ -222,7 +222,7 @@ All schemes are dark; names end in `-dark`. Old names (e.g. `stargate-blue`) sti
 | `--all` | Every target |
 
 - Wallpapers: `assets/wallpapers/` -> `~/Pictures/wallpapers`.
-- Includes Stargate, Atlantis, Universe, alien worlds, and Star Trek wallpapers. Prompts and generation status are in `assets/WALLPAPERS.md`.
+- Includes Stargate, Atlantis, Universe, alien worlds, and Star Trek wallpapers. [Prompts and generation status](assets/WALLPAPERS.md); script-inspired Stargate prompts: [set 1](assets/STARGATE-SCENE-PROMPTS.md), [set 2](assets/STARGATE-SCENE-PROMPTS-02.md).
 
 ## Kitty (`theme.sh --kitty`)
 
