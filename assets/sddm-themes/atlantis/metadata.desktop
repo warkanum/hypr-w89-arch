@@ -1,0 +1,12 @@
+[SddmGreeterTheme]
+Name=Atlantis
+Description=Ocean city expedition login
+Author=warkanum
+License=GPL-3.0-or-later
+Type=sddm-theme
+Version=1.0
+ConfigFile=theme.conf
+MainScript=Main.qml
+Theme-Id=atlantis
+Theme-API=2.0
+QtVersion=6

@@ -20,7 +20,7 @@ if ! source "$(dirname "$(readlink -f "$0")")/Global_functions.sh"; then
 fi
 
 LOG="Install-Logs/install-$(date +%d-%H%M%S)_hypr_theme.log"
-src="assets/hypr-themes"
+src="assets/themes"
 share="$HOME/.local/share/hypr-themes"
 default_theme="stargate-carbon-dark"
 
@@ -33,7 +33,7 @@ fi
 mkdir -p "$share" "$HOME/.local/bin" "$HOME/.config/wallust/colorschemes" "$HOME/.local/state/hypr"
 cp -f "$src"/*.json "$src/kde-colors.py" "$share/"
 cp -f "$src"/*.json "$HOME/.config/wallust/colorschemes/"
-install -m 755 "$src/hypr-theme" "$HOME/.local/bin/hypr-theme"
+install -m 755 "desktops/hyprland/hypr-theme" "$HOME/.local/bin/hypr-theme"
 echo "${OK} Installed colour schemes and hypr-theme." 2>&1 | tee -a "$LOG"
 
 # Remove the stock wallpapers shipped with Hyprland-Dots (names taken from the cloned dots)
@@ -45,11 +45,9 @@ if [ -d vendor/Hyprland-Dots/wallpapers ]; then
   echo "${OK} Removed stock wallpapers." 2>&1 | tee -a "$LOG"
 fi
 
-# Wallpapers supplied by this repo
-if compgen -G "assets/hypr-themes/wallpapers/*" >/dev/null; then
-  mkdir -p "$HOME/Pictures/wallpapers"
-  cp -f assets/hypr-themes/wallpapers/* "$HOME/Pictures/wallpapers/"
-fi
+# The wallpaper collection is shared by every desktop backend.
+source "$PARENT_DIR/lib/assets.sh"
+copy_wallpapers "$HOME/Pictures/wallpapers"
 
 # Dots call `wallust theme` for the saved global theme; ours are colorschemes, so use `wallust cs`
 ws="$HOME/.config/hypr/scripts/WallustSwww.sh"
